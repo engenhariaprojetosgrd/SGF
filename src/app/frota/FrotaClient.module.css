@@ -1,0 +1,233 @@
+/* ── Fleet Summary Cards ── */
+.fleetSummary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.fsumCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 80px;
+  flex: 1;
+  border-top: 3px solid transparent;
+}
+.fsumNum {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+}
+.fsumLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9ca3af;
+}
+
+/* ── Filter Buttons ── */
+.filterBar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.filterLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  background: #1a56db;
+  color: #fff;
+  transition: all 0.15s;
+}
+.btnPrimary:hover { background: #1e429f; }
+.btnOutline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  background: #fff;
+  color: #374151;
+  transition: all 0.15s;
+}
+.btnOutline:hover { background: #f9fafb; }
+
+/* ── Frota Section Separator ── */
+.frotaSection { margin-bottom: 40px; }
+.frotaSectionHd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+/* ── Category Section ── */
+.fleetSection { margin-bottom: 36px; }
+.fleetSecHd {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e5e7eb;
+  flex-wrap: wrap;
+}
+.fleetSecDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.fleetSecTitle {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+}
+.fleetSecBadge {
+  font-size: 11px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.fleetSecStats {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #9ca3af;
+  flex-wrap: wrap;
+}
+
+/* ── Fleet Grid ── */
+.fleetGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+  gap: 14px;
+}
+
+/* ── Equipment Card ── */
+.equipCard {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.equipCard:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.13);
+  transform: translateY(-3px);
+  border-color: #d1d5db;
+}
+.equipCardCritico {
+  border: 2px solid #ef4444 !important;
+}
+.equipCardParado {
+  border: 1px solid #d1d5db;
+  opacity: 0.85;
+}
+
+/* ── Icon Area ── */
+.equipIconArea {
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.equipIconArea svg {
+  width: 64px;
+  height: 64px;
+}
+.equipStatusDot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.8);
+}
+
+/* ── Card Body ── */
+.equipCardBody { padding: 12px 14px; }
+.equipId {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.2px;
+}
+.equipModel {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+.equipStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.equipMetaRow {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f3f4f6;
+}
+.equipMetaItem { display: flex; flex-direction: column; }
+.equipMetaLabel {
+  font-size: 9px;
+  color: #9ca3af;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.equipMetaVal {
+  font-size: 12px;
+  font-weight: 700;
+  color: #374151;
+}
+
+/* ── Empty state ── */
+.emptyState {
+  text-align: center;
+  padding: 60px;
+  color: #9ca3af;
+}
+.emptyIcon { font-size: 48px; margin-bottom: 16px; }
+.emptyTitle { font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #374151; }
+.emptySubtitle { font-size: 13px; }
