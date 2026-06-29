@@ -434,3 +434,7 @@ html[data-theme="dark"] body { background: var(--bg); color: var(--text); }
 .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .topbar-title { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; white-space: nowrap; }
 .topbar { box-shadow: 0 1px 0 rgba(0,0,0,.02); }
+
+/* Título fica só na topbar (remove duplicata no corpo) + respiro abaixo da faixa branca */
+.page-title { display: none; }
+.topbar { margin-bottom: 30px; }

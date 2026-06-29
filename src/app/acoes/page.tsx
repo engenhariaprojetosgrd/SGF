@@ -46,6 +46,19 @@ export default function AcoesPage() {
     })
   }, [])
 
+  const [showModal, setShowModal] = useState(false)
+  const [form, setForm] = useState({ descricao: '', responsavel: '', prazo: '', tipo: 'Corretiva Estrutural', equipamento_tag: '' })
+  const [saving, setSaving] = useState(false)
+  useEffect(() => { if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('novo')) setShowModal(true) }, [])
+  async function salvarAcao() {
+    if (!form.descricao.trim()) return
+    setSaving(true)
+    const { data } = await supabase.from('acoes').insert({ descricao: form.descricao, responsavel: form.responsavel || '—', prazo: form.prazo || null, tipo: form.tipo, equipamento_tag: form.equipamento_tag || null, status: 'pendente' }).select().single()
+    if (data) setAcoes(prev => [...prev, data])
+    setSaving(false); setShowModal(false)
+    setForm({ descricao: '', responsavel: '', prazo: '', tipo: 'Corretiva Estrutural', equipamento_tag: '' })
+  }
+
   const comStatus = acoes.map(a => ({ a, st: statusCalc(a) }))
   const cont = {
     atrasada:  comStatus.filter(x => x.st === 'atrasada').length,
@@ -64,10 +77,11 @@ export default function AcoesPage() {
           <div className="page-title">✅ Plano de Ação</div>
           <div className="page-sub">Gerenciamento de todas as ações e compromissos da equipe</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className="badge badge-danger">{cont.atrasada} atrasadas</span>
           <span className="badge badge-blue">{cont.andamento} em andamento</span>
           <span className="badge badge-success">{cont.concluida} concluídas</span>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>＋ Nova Ação</button>
         </div>
       </div>
 
@@ -147,6 +161,39 @@ export default function AcoesPage() {
           </div>
         )}
       </div>
+
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: 'var(--card-bg)', borderRadius: 12, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>✅ Nova Ação do Plano</span>
+              <button className="btn btn-ghost btn-xs" onClick={() => setShowModal(false)}>✕</button>
+            </div>
+            <div style={{ padding: 24 }}>
+              <div className="form-group">
+                <label className="form-label">Descrição da Ação <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <textarea className="form-control" rows={2} placeholder="O que será feito..." value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
+              </div>
+              <div className="form-row form-group">
+                <div><label className="form-label">Responsável</label><input className="form-control" placeholder="Nome" value={form.responsavel} onChange={e => setForm(f => ({ ...f, responsavel: e.target.value }))} /></div>
+                <div><label className="form-label">Prazo</label><input type="date" className="form-control" value={form.prazo} onChange={e => setForm(f => ({ ...f, prazo: e.target.value }))} /></div>
+              </div>
+              <div className="form-row form-group">
+                <div><label className="form-label">Tipo</label>
+                  <select className="form-control" value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}>
+                    <option>Corretiva Imediata</option><option>Corretiva Estrutural</option><option>Preventiva</option><option>Melhoria de Processo</option>
+                  </select>
+                </div>
+                <div><label className="form-label">Equipamento (opcional)</label><input className="form-control" placeholder="Ex: 9401" value={form.equipamento_tag} onChange={e => setForm(f => ({ ...f, equipamento_tag: e.target.value }))} /></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancelar</button>
+                <button className="btn btn-primary" onClick={salvarAcao} disabled={saving || !form.descricao.trim()}>{saving ? 'Salvando...' : '✓ Salvar Ação'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

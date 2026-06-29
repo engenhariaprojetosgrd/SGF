@@ -366,7 +366,7 @@ export default function FarolPage() {
                                   return <span key={e.id} className="badge" style={{ background: 'var(--gray-100)', color: dfColor(v) }}>{e.tag}: {fmtDf(v)}</span>
                                 })}
                               </div>
-                              <a href="/acoes" className="btn btn-outline btn-xs">Abrir Plano de Ação →</a>
+                              <a href="/acoes?novo=1" className="btn btn-outline btn-xs">Abrir Plano de Ação →</a>
                             </div>
                           </td>
                         </tr>
