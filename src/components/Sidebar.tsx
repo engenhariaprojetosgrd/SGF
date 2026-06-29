@@ -33,6 +33,7 @@ const nav = [
     items: [
       { id: 'frota', href: '/frota', label: 'Frota', icon: '🚧' },
       { id: 'indicadores', href: '/indicadores', label: 'Indicadores', icon: '📈' },
+      { id: 'importar', href: '/importar', label: 'Importar Dados', icon: '📥' },
       { id: 'historico', href: '/historico', label: 'Histórico', icon: '🕐' },
     ],
   },
