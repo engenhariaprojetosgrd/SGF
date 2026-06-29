@@ -429,3 +429,8 @@ html[data-theme="dark"] body { background: var(--bg); color: var(--text); }
 .app-footer-grd { font-weight: 800; color: var(--primary); letter-spacing: .5px; }
 .app-footer-emp { font-weight: 600; color: var(--text); }
 .app-footer-sep { color: var(--gray-300); }
+
+/* TopBar com título da página */
+.topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar-title { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; white-space: nowrap; }
+.topbar { box-shadow: 0 1px 0 rgba(0,0,0,.02); }

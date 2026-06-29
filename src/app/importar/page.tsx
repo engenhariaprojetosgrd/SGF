@@ -117,7 +117,7 @@ export default function ImportarPage() {
     const avg = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length
     const kpiRows = Object.entries(agg).map(([k, v]) => {
       const [frota, tipo_periodo, data_referencia] = k.split('|')
-      const row: Record<string, unknown> = { frota, tipo_periodo, data_referencia }
+      const row: Record<string, unknown> = { frota, tipo_periodo, data_referencia, observacoes: null }
       if (v.df.length) row.df_percent = Math.round(avg(v.df) * 10) / 10
       if (v.mttr.length) row.mttr_horas = Math.round(avg(v.mttr) * 100) / 100
       if (v.mtbf.length) row.mtbf_horas = Math.round(avg(v.mtbf) * 100) / 100

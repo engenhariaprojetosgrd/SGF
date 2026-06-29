@@ -5,6 +5,13 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Sidebar } from './Sidebar'
 
+const TITLES: Record<string, string> = {
+  '/farol': 'Farol Diário', '/painel': 'Painel de Controle', '/falhas': 'RAF e Agressores',
+  '/raf/novo': 'Análise RAF', '/acoes': 'Plano de Ação', '/kanban': 'Kanban do Turno',
+  '/atividade/nova': 'Nova Atividade', '/corretiva': 'Histórico Corretiva', '/observacoes': 'Observações',
+  '/frota': 'Frota', '/indicadores': 'Indicadores', '/importar': 'Importar Dados', '/historico': 'Histórico',
+}
+
 export function Shell({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -12,6 +19,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const dragging = useRef(false)
   const pathname = usePathname()
   const router = useRouter()
+  const titulo = TITLES[pathname] ?? 'SGF'
 
   useEffect(() => {
     const t = (localStorage.getItem('sgf-theme') as 'light' | 'dark') || 'light'
@@ -23,9 +31,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => { setMobileOpen(false) }, [pathname])
-  useEffect(() => {
-    if (session === null && pathname !== '/login') router.replace('/login')
-  }, [session, pathname, router])
+  useEffect(() => { if (session === null && pathname !== '/login') router.replace('/login') }, [session, pathname, router])
 
   function toggleTheme() {
     const t = theme === 'dark' ? 'light' : 'dark'
@@ -63,7 +69,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <div className="mobile-backdrop" onClick={() => setMobileOpen(false)} />
       <main className="main-content">
         <div className="topbar">
-          <button className="icon-btn hamburger" onClick={() => setMobileOpen(o => !o)} title="Menu">☰</button>
+          <div className="topbar-left">
+            <button className="icon-btn hamburger" onClick={() => setMobileOpen(o => !o)} title="Menu">☰</button>
+            <span className="topbar-title">{titulo}</span>
+          </div>
           <div className="topbar-right">
             <span className="topbar-user">{session.user.email}</span>
             <button className="icon-btn" onClick={toggleTheme} title="Tema claro / escuro">{theme === 'dark' ? '☀️' : '🌙'}</button>
@@ -77,7 +86,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <span className="app-footer-sep">|</span>
             <span className="app-footer-emp">Mineração Rio do Norte</span>
             <span className="app-footer-sep">|</span>
-            <span>Seção: Engenharia</span>
+            <span>Engenharia</span>
           </div>
           <div>SGF — Sistema de Gestão de Falhas da Frota</div>
         </footer>

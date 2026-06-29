@@ -1,7 +1,9 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { IndicadorKPI, Equipamento } from '@/lib/types'
+
+type DFEq = { equipamento_tag: string; tipo_periodo: string; data_referencia: string; valor: number }
 
 const META = 85
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
@@ -103,14 +105,17 @@ export default function FarolPage() {
   const [frotaSel, setFrotaSel] = useState<string>('todas')
   const [openTop, setOpenTop] = useState(true)
   const [expSemana, setExpSemana] = useState<string | null>(null)
+  const [dfEq, setDfEq] = useState<DFEq[]>([])
 
   useEffect(() => {
     Promise.all([
       supabase.from('indicadores_kpi').select('*').order('data_referencia', { ascending: true }),
       supabase.from('equipamentos').select('*').order('categoria').order('tag'),
-    ]).then(([k, e]) => {
+      supabase.from('df_equip').select('equipamento_tag,tipo_periodo,data_referencia,valor').eq('metrica', 'df'),
+    ]).then(([k, e, d]) => {
       setKpis((k.data ?? []) as IndicadorKPI[])
       setEquip((e.data ?? []) as Equipamento[])
+      setDfEq((d.data ?? []) as DFEq[])
       setLoading(false)
     })
   }, [])
@@ -156,7 +161,30 @@ export default function FarolPage() {
   const serieMTBF = mensalFrota.filter(k => k.mtbf_horas != null).map(k => ({ lab: fmtMesAno(k.data_referencia), v: k.mtbf_horas as number }))
   const serieMTTR = mensalFrota.filter(k => k.mttr_horas != null).map(k => ({ lab: fmtMesAno(k.data_referencia), v: k.mttr_horas as number }))
 
-  const abaixoSemana = categorias.map(cat => ({ cat, kpi: latest(cat, 'semanal') })).filter(x => x.kpi?.df_percent != null && x.kpi.df_percent < META)
+  const tagCat: Record<string, string> = {}
+  equip.forEach(e => { tagCat[String(e.tag)] = e.categoria })
+  const dfEquipMes = (tag: string) => {
+    const arr = dfEq.filter(x => x.equipamento_tag === String(tag) && x.tipo_periodo === 'mensal').sort((a, b) => a.data_referencia.localeCompare(b.data_referencia))
+    return arr.length ? arr[arr.length - 1].valor : null
+  }
+  const diariosEq = dfEq.filter(x => x.tipo_periodo === 'diario')
+  const maxDataSem = diariosEq.length ? diariosEq.map(x => x.data_referencia).sort().slice(-1)[0] : null
+  const semanaAlvo = maxDataSem ? isoWeek(maxDataSem) : null
+  const semEquip = (tag: string) => {
+    const arr = diariosEq.filter(x => x.equipamento_tag === tag && semanaAlvo != null && isoWeek(x.data_referencia) === semanaAlvo)
+    return arr.length ? arr.reduce((s, v) => s + v.valor, 0) / arr.length : null
+  }
+  const semAgg: Record<string, number[]> = {}
+  for (const x of diariosEq) {
+    if (semanaAlvo == null || isoWeek(x.data_referencia) !== semanaAlvo) continue
+    const cat = tagCat[String(x.equipamento_tag)]
+    if (!cat) continue
+    ;(semAgg[cat] = semAgg[cat] ?? []).push(x.valor)
+  }
+  const abaixoSemana = Object.entries(semAgg)
+    .map(([cat, vals]) => ({ cat, df: vals.reduce((s, v) => s + v, 0) / vals.length, semana: semanaAlvo as number, ref: maxDataSem as string }))
+    .filter(x => x.df < META)
+    .sort((a, b) => a.df - b.df)
 
   const equipFiltrado = frotaSel === 'todas' ? equip : equip.filter(e => e.categoria === frotaSel)
   const dfDoMes = (cat: string) => latest(cat, 'mensal')?.df_percent ?? null
@@ -269,7 +297,7 @@ export default function FarolPage() {
             <div className="fleet-grid">
               {equipFiltrado.map(e => {
                 const si = statusInfo(e.status)
-                const df = dfDoMes(e.categoria)
+                const df = dfEquipMes(e.tag) ?? dfDoMes(e.categoria)
                 const pct = df != null ? Math.max(0, Math.min(100, df)) : 0
                 const cls = df == null ? '' : df >= META ? 'success' : df >= META - 5 ? 'warning' : 'danger'
                 return (
@@ -314,41 +342,36 @@ export default function FarolPage() {
             <table>
               <thead><tr><th>Frota</th><th>Semana</th><th>DF Semana</th><th>Déficit</th><th>Referência</th><th>Resumo</th></tr></thead>
               <tbody>
-                {abaixoSemana.map(({ cat, kpi }) => {
+                {abaixoSemana.map(({ cat, df, semana, ref }) => {
                   const aberto = expSemana === cat
-                  const temResumo = !!(kpi!.ap_motivo || kpi!.ap_plano || kpi!.ap_responsavel || kpi!.ap_prazo)
+                  const equipsCat = equip.filter(e => e.categoria === cat)
                   return (
-                    <>
-                      <tr key={cat} className="clickable" onClick={() => setExpSemana(aberto ? null : cat)}>
+                    <Fragment key={cat}>
+                      <tr className="clickable" onClick={() => setExpSemana(aberto ? null : cat)}>
                         <td className="fw-700">{cat}</td>
-                        <td><span className="badge badge-gray">Semana {isoWeek(kpi!.data_referencia)}</span></td>
-                        <td><span className="fw-700 text-danger">{fmtDf(kpi!.df_percent)}</span></td>
-                        <td><span className="badge badge-danger">-{(META - kpi!.df_percent).toFixed(1)}%</span></td>
-                        <td className="text-xs text-muted">{fmtDiaMes(kpi!.data_referencia)}</td>
+                        <td><span className="badge badge-gray">Semana {semana}</span></td>
+                        <td><span className="fw-700 text-danger">{fmtDf(df)}</span></td>
+                        <td><span className="badge badge-danger">-{(META - df).toFixed(1)}%</span></td>
+                        <td className="text-xs text-muted">{fmtDiaMes(ref)}</td>
                         <td><button className="btn btn-ghost btn-xs">{aberto ? '▲' : '▼'}</button></td>
                       </tr>
                       {aberto && (
-                        <tr key={cat + '-d'}>
+                        <tr>
                           <td colSpan={6} style={{ background: 'var(--gray-50)' }}>
-                            {temResumo ? (
-                              <div style={{ padding: '8px 4px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <div><span className="fw-700 text-sm">Causa / Motivo da baixa DF:</span><div className="text-sm" style={{ color: 'var(--gray-700)' }}>{kpi!.ap_motivo ?? '—'}</div></div>
-                                <div><span className="fw-700 text-sm">Intervenção / Plano:</span><div className="text-sm" style={{ color: 'var(--gray-700)' }}>{kpi!.ap_plano ?? '—'}</div></div>
-                                <div style={{ display: 'flex', gap: 24, fontSize: 12, color: 'var(--gray-600)' }}>
-                                  <span><b>Responsável:</b> {kpi!.ap_responsavel ?? '—'}</span>
-                                  <span><b>Prazo:</b> {kpi!.ap_prazo ?? '—'}</span>
-                                </div>
-                                <a href="/acoes" className="btn btn-outline btn-xs" style={{ alignSelf: 'flex-start' }}>Abrir Plano de Ação →</a>
+                            <div style={{ padding: '8px 4px' }}>
+                              <div className="fw-700 text-sm" style={{ marginBottom: 6 }}>DF da semana por equipamento — {cat}:</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                                {equipsCat.map(e => {
+                                  const v = semEquip(String(e.tag))
+                                  return <span key={e.id} className="badge" style={{ background: 'var(--gray-100)', color: dfColor(v) }}>{e.tag}: {fmtDf(v)}</span>
+                                })}
                               </div>
-                            ) : (
-                              <div className="text-sm text-muted" style={{ padding: '8px 4px' }}>
-                                Nenhum resumo registrado para esta frota. Preencha motivo, intervenção e responsável ao lançar o indicador semanal abaixo da meta.
-                              </div>
-                            )}
+                              <a href="/acoes" className="btn btn-outline btn-xs">Abrir Plano de Ação →</a>
+                            </div>
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   )
                 })}
               </tbody>

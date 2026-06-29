@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import type { IndicadorKPI } from '@/lib/types'
 
 type Periodo  = 'diario' | 'semanal' | 'mensal'
-type FrotaKey = 'geral' | 'EXC' | 'CAM' | 'TRE' | 'MOT' | 'BOT'
+type FrotaKey = string
 
 const META_DF = 85
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
@@ -68,14 +68,7 @@ function ChartSVG({ dados, daily = false }: { dados: IndicadorKPI[]; daily?: boo
   )
 }
 
-const FROTAS: { key: FrotaKey; label: string }[] = [
-  { key:'geral', label:'Frota Completa' },
-  { key:'EXC',   label:'Escavadeiras' },
-  { key:'CAM',   label:'Caminhões' },
-  { key:'TRE',   label:'Tratores' },
-  { key:'MOT',   label:'Motoniveladoras' },
-  { key:'BOT',   label:'Outros' },
-]
+const frotaLabel = (f: string) => f === 'geral' ? 'Frota Completa' : f
 
 export default function IndicadoresPage() {
   const [kpis, setKpis]       = useState<IndicadorKPI[]>([])
@@ -92,6 +85,8 @@ export default function IndicadoresPage() {
       setLoading(false)
     })
   }, [])
+
+  const frotasDisp = useMemo(() => ['geral', ...[...new Set(kpis.filter(k => k.frota !== 'geral').map(k => k.frota))].sort()], [kpis])
 
   const dados = useMemo(() =>
     kpis.filter(k => k.tipo_periodo === periodo && k.frota === frota)
@@ -153,11 +148,11 @@ export default function IndicadoresPage() {
             <div>
               <div className="form-label" style={{ marginBottom:8 }}>Frota / Escopo</div>
               <div className="frota-selector">
-                {FROTAS.map(f => (
-                  <button key={f.key}
-                    className={`frota-btn ${frota === f.key ? 'active' : ''}`}
-                    onClick={() => setFrota(f.key)}>
-                    {f.label}
+                {frotasDisp.map(f => (
+                  <button key={f}
+                    className={`frota-btn ${frota === f ? 'active' : ''}`}
+                    onClick={() => setFrota(f)}>
+                    {frotaLabel(f)}
                   </button>
                 ))}
               </div>
@@ -212,7 +207,7 @@ export default function IndicadoresPage() {
         <div className="card-hd">
           <span className="card-title">
             DF% — Histórico {periodo === 'mensal' ? 'Mensal' : periodo === 'semanal' ? 'Semanal' : 'Diário'}
-            {' · '}{FROTAS.find(f => f.key === frota)?.label}
+            {' · '}{frotaLabel(frota)}
           </span>
           <div style={{ display:'flex', gap:12, fontSize:11, color:'var(--gray-500)', alignItems:'center' }}>
             <span style={{ display:'flex',alignItems:'center',gap:4 }}>
@@ -306,7 +301,7 @@ export default function IndicadoresPage() {
                 <div>
                   <label className="form-label">Frota / Escopo</label>
                   <select className="form-control" value={form.frota} onChange={e => setForm(f => ({...f, frota:e.target.value}))}>
-                    {FROTAS.map(fr => <option key={fr.key} value={fr.key}>{fr.label}</option>)}
+                    {frotasDisp.map(fr => <option key={fr} value={fr}>{frotaLabel(fr)}</option>)}
                   </select>
                 </div>
                 <div>
