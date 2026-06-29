@@ -6,8 +6,8 @@
   margin-bottom: 24px;
 }
 .fsumCard {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 20px;
   display: flex;
@@ -27,7 +27,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 /* ── Filter Buttons ── */
@@ -41,7 +41,7 @@
 .filterLabel {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--gray-700);
 }
 .btnPrimary {
   display: inline-flex;
@@ -54,7 +54,7 @@
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
-  background: #1a56db;
+  background: var(--primary);
   color: #fff;
   transition: all 0.15s;
 }
@@ -64,17 +64,17 @@
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--gray-300);
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
-  background: #fff;
-  color: #374151;
+  background: var(--card-bg);
+  color: var(--gray-700);
   transition: all 0.15s;
 }
-.btnOutline:hover { background: #f9fafb; }
+.btnOutline:hover { background: var(--gray-50); }
 
 /* ── Frota Section Separator ── */
 .frotaSection { margin-bottom: 40px; }
@@ -95,7 +95,7 @@
   gap: 12px;
   margin-bottom: 16px;
   padding-bottom: 10px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--border);
   flex-wrap: wrap;
 }
 .fleetSecDot {
@@ -107,12 +107,12 @@
 .fleetSecTitle {
   font-size: 15px;
   font-weight: 800;
-  color: #111827;
+  color: var(--text);
 }
 .fleetSecBadge {
   font-size: 11px;
-  color: #6b7280;
-  background: #f3f4f6;
+  color: var(--gray-500);
+  background: var(--gray-100);
   padding: 2px 10px;
   border-radius: 12px;
   font-weight: 600;
@@ -122,7 +122,7 @@
   display: flex;
   gap: 16px;
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--text-muted);
   flex-wrap: wrap;
 }
 
@@ -135,9 +135,9 @@
 
 /* ── Equipment Card ── */
 .equipCard {
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   overflow: hidden;
   cursor: pointer;
   transition: all 0.2s;
@@ -146,13 +146,13 @@
 .equipCard:hover {
   box-shadow: 0 6px 20px rgba(0,0,0,0.13);
   transform: translateY(-3px);
-  border-color: #d1d5db;
+  border-color: var(--gray-300);
 }
 .equipCardCritico {
   border: 2px solid #ef4444 !important;
 }
 .equipCardParado {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--gray-300);
   opacity: 0.85;
 }
 
@@ -183,12 +183,12 @@
 .equipId {
   font-size: 15px;
   font-weight: 800;
-  color: #111827;
+  color: var(--text);
   letter-spacing: -0.2px;
 }
 .equipModel {
   font-size: 10px;
-  color: #9ca3af;
+  color: var(--text-muted);
   margin-bottom: 8px;
   line-height: 1.3;
 }
@@ -206,12 +206,12 @@
   justify-content: space-between;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--gray-100);
 }
 .equipMetaItem { display: flex; flex-direction: column; }
 .equipMetaLabel {
   font-size: 9px;
-  color: #9ca3af;
+  color: var(--text-muted);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -219,15 +219,15 @@
 .equipMetaVal {
   font-size: 12px;
   font-weight: 700;
-  color: #374151;
+  color: var(--gray-700);
 }
 
 /* ── Empty state ── */
 .emptyState {
   text-align: center;
   padding: 60px;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 .emptyIcon { font-size: 48px; margin-bottom: 16px; }
-.emptyTitle { font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #374151; }
+.emptyTitle { font-size: 16px; font-weight: 600; margin-bottom: 8px; color: var(--gray-700); }
 .emptySubtitle { font-size: 13px; }

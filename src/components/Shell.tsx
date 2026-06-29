@@ -50,13 +50,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
   }
 
-  // Página de login: sem shell
   if (pathname === '/login') return <>{children}</>
-  // Carregando sessão
   if (session === undefined) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>Carregando...</div>
   )
-  // Sem sessão: redirecionando
   if (session === null) return null
 
   return (
@@ -66,23 +63,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <div className="mobile-backdrop" onClick={() => setMobileOpen(false)} />
       <main className="main-content">
         <div className="topbar">
-          <div className="topbar-left">
-            <button className="icon-btn hamburger" onClick={() => setMobileOpen(o => !o)} title="Menu">☰</button>
-            <span style={{ fontWeight: 800, color: 'var(--primary)', letterSpacing: '.5px' }}>SGF</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="text-xs text-muted" style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session.user.email}</span>
-            <button className="icon-btn" onClick={toggleTheme} title="Alternar tema claro / escuro">{theme === 'dark' ? '☀️' : '🌙'}</button>
+          <button className="icon-btn hamburger" onClick={() => setMobileOpen(o => !o)} title="Menu">☰</button>
+          <div className="topbar-right">
+            <span className="topbar-user">{session.user.email}</span>
+            <button className="icon-btn" onClick={toggleTheme} title="Tema claro / escuro">{theme === 'dark' ? '☀️' : '🌙'}</button>
             <button className="icon-btn" onClick={sair} title="Sair">⎋</button>
           </div>
         </div>
         {children}
-        <footer style={{ marginTop: 40, padding: '18px 4px 8px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, color: 'var(--text-muted)', fontSize: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 800, color: 'var(--primary)', letterSpacing: '.5px' }}>GRD</span>
-            <span style={{ color: 'var(--gray-300)' }}>|</span>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Mineração Rio do Norte</span>
-            <span style={{ color: 'var(--gray-300)' }}>|</span>
+        <footer className="app-footer">
+          <div className="app-footer-left">
+            <span className="app-footer-grd">GRD</span>
+            <span className="app-footer-sep">|</span>
+            <span className="app-footer-emp">Mineração Rio do Norte</span>
+            <span className="app-footer-sep">|</span>
             <span>Seção: Engenharia</span>
           </div>
           <div>SGF — Sistema de Gestão de Falhas da Frota</div>

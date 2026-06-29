@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { Equipamento } from '@/lib/types'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 import s from './FrotaClient.module.css'
 
 /* ─── SVG Icons (white fill, from prototype) ─── */
@@ -65,8 +66,17 @@ const FILTERS: [SF, string][] = [
   ['parado', '⛔ Parado'],
 ]
 
-export default function FrotaClient({ equipamentos }: { equipamentos: Equipamento[] }) {
+export default function FrotaClient() {
+  const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
+  const [loadingEq, setLoadingEq] = useState(true)
   const [filter, setFilter] = useState<SF>('todos')
+
+  useEffect(() => {
+    supabase.from('equipamentos').select('*').order('tag').then(({ data }) => {
+      setEquipamentos((data ?? []) as Equipamento[])
+      setLoadingEq(false)
+    })
+  }, [])
 
   const filtered = useMemo(() =>
     filter === 'todos' ? equipamentos : equipamentos.filter(e => e.status === filter),
@@ -96,8 +106,8 @@ export default function FrotaClient({ equipamentos }: { equipamentos: Equipament
       {/* ── Topbar Actions ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '20px' }}>
         <div>
-          <h1 style={{ fontSize: '17px', fontWeight: 700, color: '#111827', marginBottom: '2px' }}>Frota de Equipamentos</h1>
-          <p style={{ fontSize: '12px', color: '#9ca3af' }}>Visão geral dos {cnt.total} equipamentos organizados por categoria</p>
+          <h1 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text)', marginBottom: '2px' }}>Frota de Equipamentos</h1>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Visão geral dos {cnt.total} equipamentos organizados por categoria</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <Link href="/raf/novo" className={s.btnOutline}>＋ Nova RAF</Link>
@@ -137,7 +147,9 @@ export default function FrotaClient({ equipamentos }: { equipamentos: Equipament
       </div>
 
       {/* ── Content ── */}
-      {filtered.length === 0 ? (
+      {loadingEq ? (
+        <div className={s.emptyState}><div className={s.emptyIcon}>⏳</div><div className={s.emptyTitle}>Carregando equipamentos...</div></div>
+      ) : filtered.length === 0 ? (
         <div className={s.emptyState}>
           <div className={s.emptyIcon}>🚛</div>
           <div className={s.emptyTitle}>Nenhum equipamento encontrado</div>
@@ -153,7 +165,7 @@ export default function FrotaClient({ equipamentos }: { equipamentos: Equipament
                 <span style={{ fontWeight: 800, fontSize: '14px', color: FROTA_COLORS[frota] }}>
                   {frota} — {FROTA_LABELS[frota]}
                 </span>
-                <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '4px' }}>
                   ({Object.values(cats).flat().length} equipamentos)
                 </span>
               </div>

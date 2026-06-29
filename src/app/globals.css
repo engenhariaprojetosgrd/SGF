@@ -420,3 +420,12 @@ html[data-theme="dark"] body { background: var(--bg); color: var(--text); }
   .ishikawa-bones, .tool-grid { grid-template-columns: 1fr; }
   .page-title { font-size: 18px; }
 }
+
+/* ─── TopBar (refino) + Footer ─── */
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.topbar-user { font-size: 12px; color: var(--text-muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-footer { margin-top: 40px; padding: 16px 4px 8px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; color: var(--text-muted); font-size: 12px; }
+.app-footer-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.app-footer-grd { font-weight: 800; color: var(--primary); letter-spacing: .5px; }
+.app-footer-emp { font-weight: 600; color: var(--text); }
+.app-footer-sep { color: var(--gray-300); }
