@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Agressor, Equipamento } from '@/lib/types'
 
-const FORM0 = { frota: '', equipamento_tag: '', sistema: '', agressor: '', descricao: '', horas_perdidas: '', criticidade: 'Média' }
+const FORM0 = { frota: '', equipamento_tag: '', sistema: '', agressor: '', descricao: '', horas_perdidas: '', criticidade: 'Média', status: 'ativo' }
 const gerarCodigo = (p: string) => p + '-' + new Date().getFullYear() + '-' + Date.now().toString().slice(-6)
 
 async function uploadFoto(file: File, pasta: string): Promise<string | null> {
@@ -21,6 +21,7 @@ export default function AgressoresPage() {
   const [equip, setEquip] = useState<Equipamento[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState(FORM0)
   const [acoesList, setAcoesList] = useState([{ desc: '', resp: '', prazo: '' }])
   const [foto, setFoto] = useState<File | null>(null)
@@ -40,57 +41,67 @@ export default function AgressoresPage() {
     load()
   }, [])
 
-  function abrir() {
-    setForm(FORM0); setAcoesList([{ desc: '', resp: '', prazo: '' }]); setFoto(null); setErro(null); setShowModal(true)
+  function abrirNovo() {
+    setEditId(null); setForm(FORM0); setAcoesList([{ desc: '', resp: '', prazo: '' }]); setFoto(null); setErro(null); setShowModal(true)
+  }
+  function abrirEditar(a: Agressor) {
+    setEditId(a.id)
+    setForm({
+      frota: a.frota ?? '', equipamento_tag: a.equipamento_tag ?? '', sistema: a.sistema ?? '',
+      agressor: a.agressor ?? '', descricao: a.descricao ?? '', horas_perdidas: a.horas_perdidas ? String(a.horas_perdidas) : '',
+      criticidade: a.criticidade ?? 'Média', status: a.status ?? 'ativo',
+    })
+    setFoto(null); setErro(null); setShowModal(true)
   }
 
-  async function salvarAgressor() {
+  async function salvar() {
     setErro(null)
     if (!form.equipamento_tag || !form.agressor) { setErro('Equipamento e agressor são obrigatórios.'); return }
     setSaving(true)
     const equipId = equip.find(e => e.tag === form.equipamento_tag)?.id ?? null
-    const codigo = gerarCodigo('AGR')
-    const acoesValidas = acoesList.filter(a => a.desc.trim())
     let foto_url: string | null = null
     if (foto) {
       foto_url = await uploadFoto(foto, 'agressores')
       if (!foto_url) { setErro('Falha ao enviar a foto. Verifique se o bucket "anexos" existe.'); setSaving(false); return }
     }
+
+    // ── EDIÇÃO ──
+    if (editId) {
+      const patch: Record<string, unknown> = {
+        equipamento_id: equipId, equipamento_tag: form.equipamento_tag, frota: form.frota || null,
+        sistema: form.sistema || null, agressor: form.agressor, descricao: form.descricao || form.agressor,
+        criticidade: form.criticidade || null, status: form.status,
+        horas_perdidas: form.horas_perdidas ? Number(form.horas_perdidas) : 0,
+      }
+      if (foto_url) patch.foto_url = foto_url
+      const { data, error } = await supabase.from('agressores').update(patch).eq('id', editId).select().single()
+      setSaving(false)
+      if (error) { setErro('Erro ao salvar: ' + error.message); return }
+      if (data) setAgres(prev => prev.map(x => x.id === editId ? (data as Agressor) : x))
+      setShowModal(false)
+      return
+    }
+
+    // ── NOVO ──
+    const codigo = gerarCodigo('AGR')
+    const acoesValidas = acoesList.filter(a => a.desc.trim())
     const { data: novo, error } = await supabase.from('agressores').insert({
-      equipamento_id: equipId,
-      equipamento_tag: form.equipamento_tag,
-      frota: form.frota || null,
-      sistema: form.sistema || null,
-      agressor: form.agressor,
-      descricao: form.descricao || form.agressor,
-      criticidade: form.criticidade || null,
-      acoes: acoesValidas.map(a => a.desc).join(' | ') || null,
-      codigo,
-      foto_url,
-      horas_perdidas: form.horas_perdidas ? Number(form.horas_perdidas) : 0,
-      ocorrencias: 0,
-      custo_total: 0,
-      status: 'ativo',
+      equipamento_id: equipId, equipamento_tag: form.equipamento_tag, frota: form.frota || null,
+      sistema: form.sistema || null, agressor: form.agressor, descricao: form.descricao || form.agressor,
+      criticidade: form.criticidade || null, acoes: acoesValidas.map(a => a.desc).join(' | ') || null,
+      codigo, foto_url, horas_perdidas: form.horas_perdidas ? Number(form.horas_perdidas) : 0,
+      ocorrencias: 0, custo_total: 0, status: form.status,
     }).select().single()
-
     if (error) { setErro('Erro ao salvar agressor: ' + error.message); setSaving(false); return }
-
     if (novo && acoesValidas.length > 0) {
       await supabase.from('acoes').insert(acoesValidas.map(a => ({
-        agressor_id: novo.id,
-        equipamento_tag: form.equipamento_tag,
-        tipo: 'Corretiva Estrutural',
-        descricao: a.desc,
-        responsavel: a.resp || '—',
-        prazo: a.prazo || null,
-        status: 'pendente',
-        origem: 'agressor',
-        codigo,
+        agressor_id: novo.id, equipamento_tag: form.equipamento_tag, tipo: 'Corretiva Estrutural',
+        descricao: a.desc, responsavel: a.resp || '—', prazo: a.prazo || null, status: 'pendente',
+        origem: 'agressor', codigo,
       })))
     }
     setSaving(false)
     setShowModal(false)
-    // vai para o Plano de Ação (as ações do agressor aparecem lá com o ID de origem)
     router.push('/acoes')
   }
 
@@ -112,7 +123,7 @@ export default function AgressoresPage() {
           <span className="card-title">Agressores Crônicos da Frota</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="text-xs text-muted">{agres.length} agressor{agres.length !== 1 ? 'es' : ''}</span>
-            <button className="btn btn-primary btn-sm" onClick={abrir}>＋ Adicionar Agressor</button>
+            <button className="btn btn-primary btn-sm" onClick={abrirNovo}>＋ Adicionar Agressor</button>
           </div>
         </div>
         {agres.length === 0 ? (
@@ -124,15 +135,15 @@ export default function AgressoresPage() {
         ) : (
           <div className="tbl-wrap">
             <table>
-              <thead><tr><th>ID</th><th>Equipamento</th><th>Frota</th><th>Sistema</th><th>Agressor</th><th>Criticidade</th><th>Horas</th><th>Foto</th><th>Status</th></tr></thead>
+              <thead><tr><th>ID</th><th>Equipamento</th><th>Frota</th><th>Sistema</th><th>Agressor</th><th>Criticidade</th><th>Horas</th><th>Foto</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {agres.map(a => (
-                  <tr key={a.id} className="clickable">
+                  <tr key={a.id}>
                     <td className="text-xs text-muted">{a.codigo ?? '—'}</td>
                     <td className="fw-700">{a.equipamento_tag ?? '—'}</td>
                     <td className="text-sm">{a.frota ?? '—'}</td>
                     <td className="text-sm">{a.sistema ?? '—'}</td>
-                    <td style={{ maxWidth: 220 }}><div className="fw-600 text-sm">{a.agressor ?? a.descricao}</div></td>
+                    <td style={{ maxWidth: 200 }}><div className="fw-600 text-sm">{a.agressor ?? a.descricao}</div></td>
                     <td><span className={'badge ' + (a.criticidade === 'Crítica' ? 'badge-danger' : a.criticidade === 'Alta' ? 'badge-warning' : a.criticidade === 'Média' ? 'badge-blue' : 'badge-gray')}>{a.criticidade ?? '—'}</span></td>
                     <td className="fw-600">{a.horas_perdidas ? a.horas_perdidas + 'h' : '—'}</td>
                     <td>{a.foto_url ? <a href={a.foto_url} target="_blank" rel="noreferrer" title="Ver foto">🖼️</a> : '—'}</td>
@@ -141,6 +152,7 @@ export default function AgressoresPage() {
                         {a.status === 'em_tratamento' ? 'Tratando' : a.status === 'resolvido' ? 'Resolvido' : 'Ativo'}
                       </span>
                     </td>
+                    <td><button className="btn btn-outline btn-xs" onClick={() => abrirEditar(a)}>✏️ Editar</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -153,7 +165,7 @@ export default function AgressoresPage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowModal(false)}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card-bg)', borderRadius: 12, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
             <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 700, fontSize: 15 }}>🟡 Novo Agressor Crônico</span>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>{editId ? '✏️ Editar Agressor' : '🟡 Novo Agressor Crônico'}</span>
               <button className="btn btn-ghost btn-xs" onClick={() => setShowModal(false)}>✕</button>
             </div>
             <div style={{ padding: 24 }}>
@@ -187,7 +199,7 @@ export default function AgressoresPage() {
                 <label className="form-label">Descrição do agressor</label>
                 <textarea className="form-control" rows={2} placeholder="Detalhe o que se repete e por que é um agressor crônico..." value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
               </div>
-              <div className="form-row form-group">
+              <div className="form-row-3 form-group">
                 <div>
                   <label className="form-label">Horas perdidas</label>
                   <input type="number" step="0.1" className="form-control" placeholder="Ex: 18" value={form.horas_perdidas} onChange={e => setForm(f => ({ ...f, horas_perdidas: e.target.value }))} />
@@ -201,28 +213,39 @@ export default function AgressoresPage() {
                     <option value="Crítica">Crítica</option>
                   </select>
                 </div>
+                <div>
+                  <label className="form-label">Status</label>
+                  <select className="form-control" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                    <option value="ativo">Ativo</option>
+                    <option value="em_tratamento">Em Tratamento</option>
+                    <option value="resolvido">Resolvido</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Ações do Plano</label>
-                {acoesList.map((ac, i) => (
-                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 8, background: 'var(--gray-50)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <span className="text-xs fw-700 text-muted">Ação {i + 1}</span>
-                      {acoesList.length > 1 && <button className="btn btn-ghost btn-xs" onClick={() => setAcoesList(l => l.filter((_, j) => j !== i))}>✕ Remover</button>}
+              {!editId && (
+                <div className="form-group">
+                  <label className="form-label">Ações do Plano</label>
+                  {acoesList.map((ac, i) => (
+                    <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 8, background: 'var(--gray-50)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <span className="text-xs fw-700 text-muted">Ação {i + 1}</span>
+                        {acoesList.length > 1 && <button className="btn btn-ghost btn-xs" onClick={() => setAcoesList(l => l.filter((_, j) => j !== i))}>✕ Remover</button>}
+                      </div>
+                      <textarea className="form-control" rows={2} placeholder="O que será feito para eliminar o agressor..." value={ac.desc} onChange={e => setAcoesList(l => l.map((x, j) => j === i ? { ...x, desc: e.target.value } : x))} />
+                      <div className="form-row" style={{ marginTop: 8 }}>
+                        <div><label className="form-label">Responsável</label><input className="form-control" placeholder="Nome" value={ac.resp} onChange={e => setAcoesList(l => l.map((x, j) => j === i ? { ...x, resp: e.target.value } : x))} /></div>
+                        <div><label className="form-label">Prazo</label><input type="date" className="form-control" value={ac.prazo} onChange={e => setAcoesList(l => l.map((x, j) => j === i ? { ...x, prazo: e.target.value } : x))} /></div>
+                      </div>
                     </div>
-                    <textarea className="form-control" rows={2} placeholder="O que será feito para eliminar o agressor..." value={ac.desc} onChange={e => setAcoesList(l => l.map((x, j) => j === i ? { ...x, desc: e.target.value } : x))} />
-                    <div className="form-row" style={{ marginTop: 8 }}>
-                      <div><label className="form-label">Responsável</label><input className="form-control" placeholder="Nome" value={ac.resp} onChange={e => setAcoesList(l => l.map((x, j) => j === i ? { ...x, resp: e.target.value } : x))} /></div>
-                      <div><label className="form-label">Prazo</label><input type="date" className="form-control" value={ac.prazo} onChange={e => setAcoesList(l => l.map((x, j) => j === i ? { ...x, prazo: e.target.value } : x))} /></div>
-                    </div>
-                  </div>
-                ))}
-                <button className="btn btn-outline btn-sm" onClick={() => setAcoesList(l => [...l, { desc: '', resp: '', prazo: '' }])}>＋ Adicionar Ação</button>
-              </div>
+                  ))}
+                  <button className="btn btn-outline btn-sm" onClick={() => setAcoesList(l => [...l, { desc: '', resp: '', prazo: '' }])}>＋ Adicionar Ação</button>
+                </div>
+              )}
+              {editId && <div className="text-xs text-muted" style={{ marginBottom: 12 }}>As ações vinculadas são gerenciadas na aba Plano de Ação.</div>}
 
               <div className="form-group">
-                <label className="form-label">Foto (opcional)</label>
+                <label className="form-label">Foto {editId ? '(enviar substitui a atual)' : '(opcional)'}</label>
                 <input type="file" accept="image/*" className="form-control" onChange={e => setFoto(e.target.files?.[0] ?? null)} />
                 {foto && <div className="text-xs text-muted" style={{ marginTop: 4 }}>📎 {foto.name}</div>}
               </div>
@@ -231,8 +254,8 @@ export default function AgressoresPage() {
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancelar</button>
-                <button className="btn btn-primary" onClick={salvarAgressor} disabled={saving || !form.equipamento_tag || !form.agressor}>
-                  {saving ? 'Salvando...' : '✓ Salvar e ir ao Plano'}
+                <button className="btn btn-primary" onClick={salvar} disabled={saving || !form.equipamento_tag || !form.agressor}>
+                  {saving ? 'Salvando...' : editId ? '✓ Salvar Alterações' : '✓ Salvar e ir ao Plano'}
                 </button>
               </div>
             </div>
