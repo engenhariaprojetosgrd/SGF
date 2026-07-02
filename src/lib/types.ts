@@ -93,6 +93,7 @@ export interface Agressor {
   descricao: string
   criticidade?: 'Baixa' | 'Média' | 'Alta' | 'Crítica'
   acoes?: string
+  codigo?: string
   foto_url?: string
   ocorrencias: number
   horas_perdidas: number
@@ -110,6 +111,8 @@ export interface Acao {
   raf_id?: string
   agressor_id?: string
   equipamento_tag?: string
+  origem?: 'raf' | 'agressor' | 'gatilho_df' | 'manual'
+  codigo?: string
   tipo: 'Corretiva Imediata' | 'Corretiva Estrutural' | 'Preventiva' | 'Melhoria de Processo'
   descricao: string
   responsavel: string

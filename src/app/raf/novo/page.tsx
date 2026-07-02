@@ -129,9 +129,11 @@ export default function RafNovoPage() {
     if (error) { setErro('Erro ao salvar: ' + error.message); setSaving(false); return }
     if (raf) {
       const validas = acoes.filter(a => a.desc.trim())
+      const codigoRaf = form.numero_raf || ('RAF-' + new Date().getFullYear() + '-' + Date.now().toString().slice(-6))
       if (validas.length > 0) await supabase.from('acoes').insert(validas.map(a => ({
         raf_id: raf.id, equipamento_tag: form.equipamento_tag || null, tipo: 'Corretiva Estrutural',
         descricao: a.desc, responsavel: a.resp || '—', prazo: a.prazo || null, status: 'pendente',
+        origem: 'raf', codigo: codigoRaf,
       })))
       setSaved(true)
     }

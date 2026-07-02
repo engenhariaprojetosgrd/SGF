@@ -1,9 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Agressor, Equipamento } from '@/lib/types'
 
-const FORM0 = { frota: '', equipamento_tag: '', sistema: '', agressor: '', descricao: '', horas_perdidas: '', criticidade: 'Média', acoes: '', responsavel: '', prazo: '' }
+const FORM0 = { frota: '', equipamento_tag: '', sistema: '', agressor: '', descricao: '', horas_perdidas: '', criticidade: 'Média' }
+const gerarCodigo = (p: string) => p + '-' + new Date().getFullYear() + '-' + Date.now().toString().slice(-6)
 
 async function uploadFoto(file: File, pasta: string): Promise<string | null> {
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
@@ -14,11 +16,13 @@ async function uploadFoto(file: File, pasta: string): Promise<string | null> {
 }
 
 export default function AgressoresPage() {
+  const router = useRouter()
   const [agres, setAgres] = useState<Agressor[]>([])
   const [equip, setEquip] = useState<Equipamento[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(FORM0)
+  const [acoesList, setAcoesList] = useState([{ desc: '', resp: '', prazo: '' }])
   const [foto, setFoto] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -36,13 +40,17 @@ export default function AgressoresPage() {
     load()
   }, [])
 
-  function abrir() { setForm(FORM0); setFoto(null); setErro(null); setShowModal(true) }
+  function abrir() {
+    setForm(FORM0); setAcoesList([{ desc: '', resp: '', prazo: '' }]); setFoto(null); setErro(null); setShowModal(true)
+  }
 
   async function salvarAgressor() {
     setErro(null)
     if (!form.equipamento_tag || !form.agressor) { setErro('Equipamento e agressor são obrigatórios.'); return }
     setSaving(true)
     const equipId = equip.find(e => e.tag === form.equipamento_tag)?.id ?? null
+    const codigo = gerarCodigo('AGR')
+    const acoesValidas = acoesList.filter(a => a.desc.trim())
     let foto_url: string | null = null
     if (foto) {
       foto_url = await uploadFoto(foto, 'agressores')
@@ -56,7 +64,8 @@ export default function AgressoresPage() {
       agressor: form.agressor,
       descricao: form.descricao || form.agressor,
       criticidade: form.criticidade || null,
-      acoes: form.acoes || null,
+      acoes: acoesValidas.map(a => a.desc).join(' | ') || null,
+      codigo,
       foto_url,
       horas_perdidas: form.horas_perdidas ? Number(form.horas_perdidas) : 0,
       ocorrencias: 0,
@@ -66,22 +75,23 @@ export default function AgressoresPage() {
 
     if (error) { setErro('Erro ao salvar agressor: ' + error.message); setSaving(false); return }
 
-    if (novo && form.acoes) {
-      await supabase.from('acoes').insert({
+    if (novo && acoesValidas.length > 0) {
+      await supabase.from('acoes').insert(acoesValidas.map(a => ({
         agressor_id: novo.id,
         equipamento_tag: form.equipamento_tag,
         tipo: 'Corretiva Estrutural',
-        descricao: form.acoes,
-        responsavel: form.responsavel || '—',
-        prazo: form.prazo || null,
+        descricao: a.desc,
+        responsavel: a.resp || '—',
+        prazo: a.prazo || null,
         status: 'pendente',
-      })
+        origem: 'agressor',
+        codigo,
+      })))
     }
-    if (novo) setAgres(prev => [novo as Agressor, ...prev])
     setSaving(false)
     setShowModal(false)
-    setForm(FORM0)
-    setFoto(null)
+    // vai para o Plano de Ação (as ações do agressor aparecem lá com o ID de origem)
+    router.push('/acoes')
   }
 
   if (loading) return (
@@ -114,14 +124,15 @@ export default function AgressoresPage() {
         ) : (
           <div className="tbl-wrap">
             <table>
-              <thead><tr><th>Equipamento</th><th>Frota</th><th>Sistema</th><th>Agressor</th><th>Criticidade</th><th>Horas</th><th>Foto</th><th>Status</th></tr></thead>
+              <thead><tr><th>ID</th><th>Equipamento</th><th>Frota</th><th>Sistema</th><th>Agressor</th><th>Criticidade</th><th>Horas</th><th>Foto</th><th>Status</th></tr></thead>
               <tbody>
                 {agres.map(a => (
                   <tr key={a.id} className="clickable">
+                    <td className="text-xs text-muted">{a.codigo ?? '—'}</td>
                     <td className="fw-700">{a.equipamento_tag ?? '—'}</td>
                     <td className="text-sm">{a.frota ?? '—'}</td>
                     <td className="text-sm">{a.sistema ?? '—'}</td>
-                    <td style={{ maxWidth: 240 }}><div className="fw-600 text-sm">{a.agressor ?? a.descricao}</div></td>
+                    <td style={{ maxWidth: 220 }}><div className="fw-600 text-sm">{a.agressor ?? a.descricao}</div></td>
                     <td><span className={'badge ' + (a.criticidade === 'Crítica' ? 'badge-danger' : a.criticidade === 'Alta' ? 'badge-warning' : a.criticidade === 'Média' ? 'badge-blue' : 'badge-gray')}>{a.criticidade ?? '—'}</span></td>
                     <td className="fw-600">{a.horas_perdidas ? a.horas_perdidas + 'h' : '—'}</td>
                     <td>{a.foto_url ? <a href={a.foto_url} target="_blank" rel="noreferrer" title="Ver foto">🖼️</a> : '—'}</td>
@@ -191,20 +202,25 @@ export default function AgressoresPage() {
                   </select>
                 </div>
               </div>
+
               <div className="form-group">
-                <label className="form-label">Ação</label>
-                <textarea className="form-control" rows={2} placeholder="O que será feito para eliminar o agressor..." value={form.acoes} onChange={e => setForm(f => ({ ...f, acoes: e.target.value }))} />
+                <label className="form-label">Ações do Plano</label>
+                {acoesList.map((ac, i) => (
+                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 8, background: 'var(--gray-50)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span className="text-xs fw-700 text-muted">Ação {i + 1}</span>
+                      {acoesList.length > 1 && <button className="btn btn-ghost btn-xs" onClick={() => setAcoesList(l => l.filter((_, j) => j !== i))}>✕ Remover</button>}
+                    </div>
+                    <textarea className="form-control" rows={2} placeholder="O que será feito para eliminar o agressor..." value={ac.desc} onChange={e => setAcoesList(l => l.map((x, j) => j === i ? { ...x, desc: e.target.value } : x))} />
+                    <div className="form-row" style={{ marginTop: 8 }}>
+                      <div><label className="form-label">Responsável</label><input className="form-control" placeholder="Nome" value={ac.resp} onChange={e => setAcoesList(l => l.map((x, j) => j === i ? { ...x, resp: e.target.value } : x))} /></div>
+                      <div><label className="form-label">Prazo</label><input type="date" className="form-control" value={ac.prazo} onChange={e => setAcoesList(l => l.map((x, j) => j === i ? { ...x, prazo: e.target.value } : x))} /></div>
+                    </div>
+                  </div>
+                ))}
+                <button className="btn btn-outline btn-sm" onClick={() => setAcoesList(l => [...l, { desc: '', resp: '', prazo: '' }])}>＋ Adicionar Ação</button>
               </div>
-              <div className="form-row form-group">
-                <div>
-                  <label className="form-label">Responsável</label>
-                  <input className="form-control" placeholder="Nome do responsável" value={form.responsavel} onChange={e => setForm(f => ({ ...f, responsavel: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="form-label">Prazo</label>
-                  <input type="date" className="form-control" value={form.prazo} onChange={e => setForm(f => ({ ...f, prazo: e.target.value }))} />
-                </div>
-              </div>
+
               <div className="form-group">
                 <label className="form-label">Foto (opcional)</label>
                 <input type="file" accept="image/*" className="form-control" onChange={e => setFoto(e.target.files?.[0] ?? null)} />
@@ -216,7 +232,7 @@ export default function AgressoresPage() {
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancelar</button>
                 <button className="btn btn-primary" onClick={salvarAgressor} disabled={saving || !form.equipamento_tag || !form.agressor}>
-                  {saving ? 'Salvando...' : '✓ Salvar Agressor'}
+                  {saving ? 'Salvando...' : '✓ Salvar e ir ao Plano'}
                 </button>
               </div>
             </div>

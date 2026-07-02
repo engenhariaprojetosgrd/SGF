@@ -28,11 +28,23 @@ const STATUS_META: Record<StatusCalc, { label: string; badge: string }> = {
   concluida: { label: 'Concluída',    badge: 'badge-success' },
 }
 
-function origemBadge(a: Acao) {
-  if (a.raf_id)      return <span className="badge badge-raf">RAF</span>
-  if (a.agressor_id) return <span className="badge badge-agressor">Agressor</span>
-  return <span className="text-muted text-xs">—</span>
+const ORIGEM_META: Record<string, { label: string; cls: string }> = {
+  raf:        { label: 'RAF',        cls: 'badge-raf' },
+  agressor:   { label: 'Agressor',   cls: 'badge-agressor' },
+  gatilho_df: { label: 'Gatilho DF', cls: 'badge-warning' },
+  manual:     { label: 'Manual',     cls: 'badge-gray' },
 }
+function origemBadge(a: Acao) {
+  const o = a.origem ?? (a.raf_id ? 'raf' : a.agressor_id ? 'agressor' : 'manual')
+  const m = ORIGEM_META[o] ?? ORIGEM_META.manual
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <span className={'badge ' + m.cls}>{m.label}</span>
+      {a.codigo && <span className="text-xs text-muted">{a.codigo}</span>}
+    </div>
+  )
+}
+const gerarCodigo = (p: string) => p + '-' + new Date().getFullYear() + '-' + Date.now().toString().slice(-6)
 
 export default function AcoesPage() {
   const [acoes, setAcoes]     = useState<Acao[]>([])
@@ -49,13 +61,19 @@ export default function AcoesPage() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ descricao: '', responsavel: '', prazo: '', tipo: 'Corretiva Estrutural', equipamento_tag: '' })
   const [saving, setSaving] = useState(false)
-  useEffect(() => { if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('novo')) setShowModal(true) }, [])
+  const [origemNova, setOrigemNova] = useState<'gatilho_df' | 'manual'>('manual')
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('novo')) {
+      setOrigemNova('gatilho_df'); setShowModal(true)
+    }
+  }, [])
   async function salvarAcao() {
     if (!form.descricao.trim()) return
     setSaving(true)
-    const { data } = await supabase.from('acoes').insert({ descricao: form.descricao, responsavel: form.responsavel || '—', prazo: form.prazo || null, tipo: form.tipo, equipamento_tag: form.equipamento_tag || null, status: 'pendente' }).select().single()
+    const codigo = gerarCodigo(origemNova === 'gatilho_df' ? 'DF' : 'PA')
+    const { data } = await supabase.from('acoes').insert({ descricao: form.descricao, responsavel: form.responsavel || '—', prazo: form.prazo || null, tipo: form.tipo, equipamento_tag: form.equipamento_tag || null, status: 'pendente', origem: origemNova, codigo }).select().single()
     if (data) setAcoes(prev => [...prev, data])
-    setSaving(false); setShowModal(false)
+    setSaving(false); setShowModal(false); setOrigemNova('manual')
     setForm({ descricao: '', responsavel: '', prazo: '', tipo: 'Corretiva Estrutural', equipamento_tag: '' })
   }
 
