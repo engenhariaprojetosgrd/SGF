@@ -3,6 +3,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Equipamento } from '@/lib/types'
 
+async function uploadFoto(file: File, pasta: string): Promise<string | null> {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+  const path = pasta + '/' + Date.now() + '-' + Math.random().toString(36).slice(2) + '.' + ext
+  const { error } = await supabase.storage.from('anexos').upload(path, file)
+  if (error) { console.error(error); return null }
+  return supabase.storage.from('anexos').getPublicUrl(path).data.publicUrl
+}
+
 const PASSOS = [
   { num: 1, label: 'Identificação' }, { num: 2, label: 'Contextualização' }, { num: 3, label: 'Impacto' },
   { num: 4, label: 'Ferramenta' }, { num: 5, label: 'Causa Raiz' }, { num: 6, label: 'Plano de Ação' }, { num: 7, label: 'Relatório' },
@@ -54,6 +62,7 @@ export default function RafNovoPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [foto, setFoto] = useState<File | null>(null)
 
   useEffect(() => {
     supabase.from('equipamentos').select('id,tag,modelo').order('tag').then(({ data }) => setEquips((data ?? []) as Equipamento[]))
@@ -100,6 +109,11 @@ export default function RafNovoPage() {
     setErro(null); setSaving(true)
     const equipId = equips.find(e => e.tag === form.equipamento_tag)?.id ?? null
     const ferraDb = form.ferramenta === 'pq' ? '5pqs' : form.ferramenta === 'ish' ? 'ishikawa' : 'fta'
+    let foto_url: string | null = null
+    if (foto) {
+      foto_url = await uploadFoto(foto, 'rafs')
+      if (!foto_url) { setErro('Falha ao enviar a foto. Verifique se o bucket "anexos" existe.'); setSaving(false); return }
+    }
     const { data: raf, error } = await supabase.from('rafs').insert({
       numero_raf: form.numero_raf || null, equipamento_id: equipId, equipamento_tag: form.equipamento_tag || null,
       data_ocorrencia: form.data_ocorrencia ? form.data_ocorrencia.slice(0, 10) : null,
@@ -110,7 +124,7 @@ export default function RafNovoPage() {
       cinco_pqs: form.ferramenta === 'pq' ? form.por_ques.filter(Boolean) : null,
       ishikawa: form.ferramenta === 'ish' ? { efeito: form.ishikawa_efeito, causas: form.ishikawa } : null,
       fta: form.ferramenta === 'ft' ? ft : null,
-      causa_raiz: form.causa_raiz || null, status: 'em_analise', recorrente: form.hist_similar === 'sim',
+      causa_raiz: form.causa_raiz || null, foto_url, status: 'em_analise', recorrente: form.hist_similar === 'sim',
     }).select().single()
     if (error) { setErro('Erro ao salvar: ' + error.message); setSaving(false); return }
     if (raf) {
@@ -131,14 +145,13 @@ export default function RafNovoPage() {
 
   if (saved) return (
     <div>
-      <div className="page-header"><div className="page-title">🔍 Análise RAF</div></div>
+      <div className="page-header"><div className="page-title">🔍 RAF</div></div>
       <div className="card" style={{ textAlign: 'center', padding: 48 }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
         <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>RAF registrada com sucesso!</div>
         <div className="text-muted text-sm" style={{ marginBottom: 24 }}>A análise foi salva e as ações vinculadas ao plano.</div>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <button className="btn btn-outline" onClick={() => { setForm(FORM0); setAcoes([{ desc: '', resp: '', prazo: '' }]); setFt({ id: 'root', text: '', gate: 'AND', children: [] }); setPasso(1); setSaved(false) }}>Nova RAF</button>
-          <a href="/falhas" className="btn btn-primary">Ver RAFs →</a>
+          <button className="btn btn-primary" onClick={() => { setForm(FORM0); setAcoes([{ desc: '', resp: '', prazo: '' }]); setFt({ id: 'root', text: '', gate: 'AND', children: [] }); setFoto(null); setPasso(1); setSaved(false) }}>Nova RAF</button>
         </div>
       </div>
     </div>
@@ -148,10 +161,10 @@ export default function RafNovoPage() {
     <div>
       <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <div className="page-title">🔍 Análise RAF</div>
+          <div className="page-title">🔍 RAF</div>
           <div className="page-sub">Relatório de Análise de Falha — clique em qualquer etapa para navegar</div>
         </div>
-        <a href="/falhas" className="btn btn-outline btn-sm">← Voltar</a>
+        <a href="/farol" className="btn btn-outline btn-sm">← Voltar</a>
       </div>
 
       <div className="wizard-steps">
@@ -183,6 +196,7 @@ export default function RafNovoPage() {
             </div>
             <div className="form-group"><label className="form-label">Descrição Detalhada da Falha <span className="req">*</span></label><textarea className="form-control" rows={4} placeholder="Descreva o que aconteceu, como foi percebido, condições no momento..." value={form.descricao_falha} onChange={e => set('descricao_falha', e.target.value)} /></div>
             <div className="form-group"><label className="form-label">Responsável pela Análise</label><input className="form-control" placeholder="Eng. responsável pela condução da RAF" value={form.responsavel} onChange={e => set('responsavel', e.target.value)} /></div>
+            <div className="form-group"><label className="form-label">Foto da Falha (opcional)</label><input type="file" accept="image/*" className="form-control" onChange={e => setFoto(e.target.files?.[0] ?? null)} />{foto && <div className="text-xs text-muted" style={{ marginTop: 4 }}>📎 {foto.name}</div>}</div>
           </>
         )}
 

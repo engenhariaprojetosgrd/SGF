@@ -73,6 +73,7 @@ export interface RAF {
   ishikawa?: unknown
   fta?: unknown
   causa_raiz?: string
+  foto_url?: string
   status: 'em_analise' | 'concluido' | 'aprovado' | 'cancelado'
   recorrente: boolean
   frequencia_recorrencia?: string
@@ -92,6 +93,7 @@ export interface Agressor {
   descricao: string
   criticidade?: 'Baixa' | 'Média' | 'Alta' | 'Crítica'
   acoes?: string
+  foto_url?: string
   ocorrencias: number
   horas_perdidas: number
   custo_total: number

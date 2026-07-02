@@ -14,8 +14,8 @@ const nav = [
   {
     section: 'Engenharia',
     items: [
-      { id: 'falhas', href: '/falhas', label: 'RAF e Agressores', icon: '⚡' },
-      { id: 'raf', href: '/raf/novo', label: 'Análise RAF', icon: '🔍' },
+      { id: 'falhas', href: '/falhas', label: 'Agressores', icon: '🟡' },
+      { id: 'raf', href: '/raf/novo', label: 'RAF', icon: '🔍' },
       { id: 'acoes', href: '/acoes', label: 'Plano de Ação', icon: '✅' },
     ],
   },

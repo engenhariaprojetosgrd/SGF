@@ -1,38 +1,34 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { RAF, Agressor, Equipamento } from '@/lib/types'
-
-function fmtData(d: string | null | undefined) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })
-}
-function fmtMoeda(v: number | null | undefined) {
-  if (v == null) return '—'
-  return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 0 })
-}
+import type { Agressor, Equipamento } from '@/lib/types'
 
 const FORM0 = { frota: '', equipamento_tag: '', sistema: '', agressor: '', descricao: '', horas_perdidas: '', criticidade: 'Média', acoes: '', responsavel: '', prazo: '' }
 
-export default function FalhasPage() {
-  const [tab, setTab] = useState<'rafs' | 'agres'>('rafs')
-  const [rafs, setRafs] = useState<RAF[]>([])
+async function uploadFoto(file: File, pasta: string): Promise<string | null> {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+  const path = pasta + '/' + Date.now() + '-' + Math.random().toString(36).slice(2) + '.' + ext
+  const { error } = await supabase.storage.from('anexos').upload(path, file)
+  if (error) { console.error(error); return null }
+  return supabase.storage.from('anexos').getPublicUrl(path).data.publicUrl
+}
+
+export default function AgressoresPage() {
   const [agres, setAgres] = useState<Agressor[]>([])
   const [equip, setEquip] = useState<Equipamento[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(FORM0)
+  const [foto, setFoto] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      const [rRes, aRes, eRes] = await Promise.all([
-        supabase.from('rafs').select('*').order('created_at', { ascending: false }),
-        supabase.from('agressores').select('*').order('ocorrencias', { ascending: false }),
+      const [aRes, eRes] = await Promise.all([
+        supabase.from('agressores').select('*').order('created_at', { ascending: false }),
         supabase.from('equipamentos').select('id,tag,categoria,modelo').order('tag'),
       ])
-      setRafs((rRes.data ?? []) as RAF[])
       setAgres((aRes.data ?? []) as Agressor[])
       setEquip((eRes.data ?? []) as Equipamento[])
       setLoading(false)
@@ -40,14 +36,18 @@ export default function FalhasPage() {
     load()
   }, [])
 
-  const rafsCriticos = rafs.filter(r => r.status !== 'concluido' && r.status !== 'cancelado').length
-  const agresAtivos = agres.filter(a => a.status === 'ativo').length
+  function abrir() { setForm(FORM0); setFoto(null); setErro(null); setShowModal(true) }
 
   async function salvarAgressor() {
     setErro(null)
     if (!form.equipamento_tag || !form.agressor) { setErro('Equipamento e agressor são obrigatórios.'); return }
     setSaving(true)
     const equipId = equip.find(e => e.tag === form.equipamento_tag)?.id ?? null
+    let foto_url: string | null = null
+    if (foto) {
+      foto_url = await uploadFoto(foto, 'agressores')
+      if (!foto_url) { setErro('Falha ao enviar a foto. Verifique se o bucket "anexos" existe.'); setSaving(false); return }
+    }
     const { data: novo, error } = await supabase.from('agressores').insert({
       equipamento_id: equipId,
       equipamento_tag: form.equipamento_tag,
@@ -57,6 +57,7 @@ export default function FalhasPage() {
       descricao: form.descricao || form.agressor,
       criticidade: form.criticidade || null,
       acoes: form.acoes || null,
+      foto_url,
       horas_perdidas: form.horas_perdidas ? Number(form.horas_perdidas) : 0,
       ocorrencias: 0,
       custo_total: 0,
@@ -80,129 +81,67 @@ export default function FalhasPage() {
     setSaving(false)
     setShowModal(false)
     setForm(FORM0)
-    setTab('agres')
+    setFoto(null)
   }
 
   if (loading) return (
     <div>
-      <div className="page-header"><div className="page-title">⚡ RAF e Agressores</div></div>
       <div className="empty-state"><div className="empty-state-icon">⏳</div><div className="empty-state-sub">Carregando...</div></div>
     </div>
   )
 
   return (
     <div>
-      <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div className="page-title">⚡ RAF e Agressores</div>
-          <div className="page-sub">Relatórios de análise de falhas e agressores crônicos da frota</div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-outline" onClick={() => { setForm(FORM0); setErro(null); setShowModal(true) }}>＋ Adicionar Agressor</button>
-          <a href="/raf/novo" className="btn btn-primary">＋ Nova Análise RAF</a>
-        </div>
+      <div className="page-header">
+        <div className="page-title">🟡 Agressores</div>
+        <div className="page-sub">Agressores crônicos da frota</div>
       </div>
 
-      <div className="itabs">
-        <div className={'itab ' + (tab === 'rafs' ? 'active' : '')} onClick={() => setTab('rafs')}>
-          🔴 Falhas Críticas RAF
-          {rafsCriticos > 0 && <span className="badge badge-danger" style={{ marginLeft: 8 }}>{rafsCriticos}</span>}
+      <div className="card" style={{ padding: 0 }}>
+        <div className="card-hd">
+          <span className="card-title">Agressores Crônicos da Frota</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="text-xs text-muted">{agres.length} agressor{agres.length !== 1 ? 'es' : ''}</span>
+            <button className="btn btn-primary btn-sm" onClick={abrir}>＋ Adicionar Agressor</button>
+          </div>
         </div>
-        <div className={'itab ' + (tab === 'agres' ? 'active' : '')} onClick={() => setTab('agres')}>
-          🟡 Agressores
-          {agresAtivos > 0 && <span className="badge badge-warning" style={{ marginLeft: 8 }}>{agresAtivos}</span>}
-        </div>
+        {agres.length === 0 ? (
+          <div className="empty-state" style={{ padding: 48 }}>
+            <div className="empty-state-icon">🟡</div>
+            <div className="empty-state-title">Nenhum agressor registrado</div>
+            <div className="empty-state-sub">Identifique falhas recorrentes da frota como agressores</div>
+          </div>
+        ) : (
+          <div className="tbl-wrap">
+            <table>
+              <thead><tr><th>Equipamento</th><th>Frota</th><th>Sistema</th><th>Agressor</th><th>Criticidade</th><th>Horas</th><th>Foto</th><th>Status</th></tr></thead>
+              <tbody>
+                {agres.map(a => (
+                  <tr key={a.id} className="clickable">
+                    <td className="fw-700">{a.equipamento_tag ?? '—'}</td>
+                    <td className="text-sm">{a.frota ?? '—'}</td>
+                    <td className="text-sm">{a.sistema ?? '—'}</td>
+                    <td style={{ maxWidth: 240 }}><div className="fw-600 text-sm">{a.agressor ?? a.descricao}</div></td>
+                    <td><span className={'badge ' + (a.criticidade === 'Crítica' ? 'badge-danger' : a.criticidade === 'Alta' ? 'badge-warning' : a.criticidade === 'Média' ? 'badge-blue' : 'badge-gray')}>{a.criticidade ?? '—'}</span></td>
+                    <td className="fw-600">{a.horas_perdidas ? a.horas_perdidas + 'h' : '—'}</td>
+                    <td>{a.foto_url ? <a href={a.foto_url} target="_blank" rel="noreferrer" title="Ver foto">🖼️</a> : '—'}</td>
+                    <td>
+                      <span className={'badge ' + (a.status === 'resolvido' ? 'badge-success' : a.status === 'em_tratamento' ? 'badge-blue' : 'badge-warning')}>
+                        {a.status === 'em_tratamento' ? 'Tratando' : a.status === 'resolvido' ? 'Resolvido' : 'Ativo'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-
-      {tab === 'rafs' && (
-        <div className="card" style={{ padding: 0 }}>
-          <div className="card-hd">
-            <span className="card-title">Relatórios de Análise de Falha</span>
-            <span className="text-xs text-muted">{rafs.length} RAF{rafs.length !== 1 ? 's' : ''}</span>
-          </div>
-          {rafs.length === 0 ? (
-            <div className="empty-state" style={{ padding: 48 }}>
-              <div className="empty-state-icon">⚡</div>
-              <div className="empty-state-title">Nenhuma RAF registrada</div>
-              <div className="empty-state-sub">Registre falhas críticas para análise de causa raiz</div>
-              <a href="/raf/novo" className="btn btn-primary" style={{ marginTop: 16 }}>＋ Nova RAF</a>
-            </div>
-          ) : (
-            <div className="tbl-wrap">
-              <table>
-                <thead><tr><th>ID</th><th>Equipamento</th><th>Falha</th><th>Data</th><th>Custo</th><th>Status</th><th>Ações</th></tr></thead>
-                <tbody>
-                  {rafs.map(r => (
-                    <tr key={r.id} className="clickable">
-                      <td><span className="badge badge-raf">{r.numero_raf ?? ('RAF-' + String(r.id).slice(0, 4))}</span></td>
-                      <td className="fw-700">{r.equipamento_tag ?? '—'}</td>
-                      <td style={{ maxWidth: 220 }}>
-                        <div className="fw-600 text-sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.descricao_falha ?? '—'}</div>
-                      </td>
-                      <td className="text-xs">{fmtData(r.data_ocorrencia)}</td>
-                      <td className={r.custo_estimado && r.custo_estimado > 50000 ? 'fw-700 text-danger' : 'fw-600'}>{fmtMoeda(r.custo_estimado)}</td>
-                      <td>
-                        <span className={'badge ' + (r.status === 'concluido' ? 'badge-success' : r.status === 'aprovado' ? 'badge-blue' : r.status === 'cancelado' ? 'badge-gray' : 'badge-warning')}>
-                          {r.status === 'em_analise' ? 'Em Análise' : r.status === 'aprovado' ? 'Aprovado' : r.status === 'concluido' ? 'Concluído' : r.status === 'cancelado' ? 'Cancelado' : (r.status ?? 'Aberto')}
-                        </span>
-                      </td>
-                      <td><a href="/raf/novo" className="btn btn-outline btn-xs">Ver →</a></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {tab === 'agres' && (
-        <div className="card" style={{ padding: 0 }}>
-          <div className="card-hd">
-            <span className="card-title">Agressores Crônicos da Frota</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span className="text-xs text-muted">{agres.length} agressor{agres.length !== 1 ? 'es' : ''}</span>
-              <button className="btn btn-primary btn-sm" onClick={() => { setForm(FORM0); setErro(null); setShowModal(true) }}>＋ Adicionar</button>
-            </div>
-          </div>
-          {agres.length === 0 ? (
-            <div className="empty-state" style={{ padding: 48 }}>
-              <div className="empty-state-icon">🟡</div>
-              <div className="empty-state-title">Nenhum agressor registrado</div>
-              <div className="empty-state-sub">Identifique falhas recorrentes da frota como agressores</div>
-              <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => { setForm(FORM0); setErro(null); setShowModal(true) }}>＋ Adicionar Agressor</button>
-            </div>
-          ) : (
-            <div className="tbl-wrap">
-              <table>
-                <thead><tr><th>Equipamento</th><th>Frota</th><th>Sistema</th><th>Agressor</th><th>Criticidade</th><th>Horas</th><th>Status</th></tr></thead>
-                <tbody>
-                  {agres.map(a => (
-                    <tr key={a.id} className="clickable">
-                      <td className="fw-700">{a.equipamento_tag ?? '—'}</td>
-                      <td className="text-sm">{a.frota ?? '—'}</td>
-                      <td className="text-sm">{a.sistema ?? '—'}</td>
-                      <td style={{ maxWidth: 240 }}><div className="fw-600 text-sm">{a.agressor ?? a.descricao}</div></td>
-                      <td><span className={'badge ' + (a.criticidade === 'Crítica' ? 'badge-danger' : a.criticidade === 'Alta' ? 'badge-warning' : a.criticidade === 'Média' ? 'badge-blue' : 'badge-gray')}>{a.criticidade ?? '—'}</span></td>
-                      <td className="fw-600">{a.horas_perdidas ? a.horas_perdidas + 'h' : '—'}</td>
-                      <td>
-                        <span className={'badge ' + (a.status === 'resolvido' ? 'badge-success' : a.status === 'em_tratamento' ? 'badge-blue' : 'badge-warning')}>
-                          {a.status === 'em_tratamento' ? 'Tratando' : a.status === 'resolvido' ? 'Resolvido' : 'Ativo'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
 
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
-            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--gray-200)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card-bg)', borderRadius: 12, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: 700, fontSize: 15 }}>🟡 Novo Agressor Crônico</span>
               <button className="btn btn-ghost btn-xs" onClick={() => setShowModal(false)}>✕</button>
             </div>
@@ -265,6 +204,11 @@ export default function FalhasPage() {
                   <label className="form-label">Prazo</label>
                   <input type="date" className="form-control" value={form.prazo} onChange={e => setForm(f => ({ ...f, prazo: e.target.value }))} />
                 </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Foto (opcional)</label>
+                <input type="file" accept="image/*" className="form-control" onChange={e => setFoto(e.target.files?.[0] ?? null)} />
+                {foto && <div className="text-xs text-muted" style={{ marginTop: 4 }}>📎 {foto.name}</div>}
               </div>
 
               {erro && <div className="alert alert-danger" style={{ marginBottom: 12 }}>{erro}</div>}
