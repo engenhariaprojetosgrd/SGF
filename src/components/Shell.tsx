@@ -7,7 +7,7 @@ import { Sidebar } from './Sidebar'
 
 const TITLES: Record<string, string> = {
   '/farol': 'Farol Diário', '/painel': 'Painel de Controle', '/falhas': 'Agressores',
-  '/raf/novo': 'RAF', '/acoes': 'Plano de Ação', '/kanban': 'Kanban do Turno',
+  '/raf': 'RAF', '/raf/novo': 'Nova RAF', '/acoes': 'Plano de Ação', '/kanban': 'Kanban do Turno',
   '/atividade/nova': 'Nova Atividade', '/corretiva': 'Histórico Corretiva', '/observacoes': 'Observações',
   '/frota': 'Frota', '/indicadores': 'Indicadores', '/importar': 'Importar Dados', '/historico': 'Histórico',
 }

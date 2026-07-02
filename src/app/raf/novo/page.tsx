@@ -164,7 +164,7 @@ export default function RafNovoPage() {
           <div className="page-title">🔍 RAF</div>
           <div className="page-sub">Relatório de Análise de Falha — clique em qualquer etapa para navegar</div>
         </div>
-        <a href="/farol" className="btn btn-outline btn-sm">← Voltar</a>
+        <a href="/raf" className="btn btn-outline btn-sm">← Voltar</a>
       </div>
 
       <div className="wizard-steps">

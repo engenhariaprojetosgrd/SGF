@@ -15,7 +15,7 @@ const nav = [
     section: 'Engenharia',
     items: [
       { id: 'falhas', href: '/falhas', label: 'Agressores', icon: '🟡' },
-      { id: 'raf', href: '/raf/novo', label: 'RAF', icon: '🔍' },
+      { id: 'raf', href: '/raf', label: 'RAF', icon: '🔍' },
       { id: 'acoes', href: '/acoes', label: 'Plano de Ação', icon: '✅' },
     ],
   },
