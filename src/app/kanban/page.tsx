@@ -48,6 +48,22 @@ export default function KanbanPage() {
   const [equip, setEquip] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const hoje = new Date().toISOString().slice(0, 10)
+  const [selected, setSelected] = useState<OrdemManutencao | null>(null)
+  const [novaInt, setNovaInt] = useState('')
+  const [savingInt, setSavingInt] = useState(false)
+
+  async function salvarIntervencao() {
+    if (!selected || !novaInt.trim()) return
+    setSavingInt(true)
+    const carimbo = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    const texto = (selected.intervencao ? selected.intervencao + '\n' : '') + '[' + carimbo + '] ' + novaInt.trim()
+    const { error } = await supabase.from('ordens_manutencao').update({ intervencao: texto }).eq('id', selected.id)
+    setSavingInt(false)
+    if (error) { alert('Erro ao salvar intervenção: ' + error.message); return }
+    setOms(prev => prev.map(o => o.id === selected.id ? { ...o, intervencao: texto } : o))
+    setSelected(sel => sel ? { ...sel, intervencao: texto } : sel)
+    setNovaInt('')
+  }
 
   useEffect(() => {
     supabase.from('equipamentos').select('tag,modelo').then(({ data }) => {
@@ -126,7 +142,7 @@ export default function KanbanPage() {
                   cards.map(om => {
                     const modelo = om.equipamento_tag ? equip[om.equipamento_tag] : undefined
                     return (
-                      <div key={om.id} className={'kanban-card ' + critClass(om.criticidade)}>
+                      <div key={om.id} className={'kanban-card ' + critClass(om.criticidade)} onClick={() => setSelected(om)} style={{ cursor: 'pointer' }}>
                         <div className="kanban-card-hd">
                           {headerBadge(om)}
                           <span className="text-xs text-muted">{om.numero_om ?? ('OM-' + String(om.id).slice(0, 6))}</span>
@@ -139,7 +155,7 @@ export default function KanbanPage() {
                         </div>
                         <div className="kanban-card-footer">
                           <span className="text-xs text-muted">{om.sistema ?? '—'}</span>
-                          <a href="/atividade/nova" className={'btn ' + col.action.cls + ' btn-xs'}>{col.action.label}</a>
+                          <a href="/atividade/nova" onClick={e => e.stopPropagation()} className={'btn ' + col.action.cls + ' btn-xs'}>{col.action.label}</a>
                         </div>
                       </div>
                     )
@@ -148,6 +164,38 @@ export default function KanbanPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {selected && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setSelected(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card-bg)', borderRadius: 12, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <span style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>{headerBadge(selected)} {selected.equipamento_tag}{selected.equipamento_tag && equip[selected.equipamento_tag] ? ' · ' + equip[selected.equipamento_tag] : ''}</span>
+              <button className="btn btn-ghost btn-xs" onClick={() => setSelected(null)}>✕</button>
+            </div>
+            <div style={{ padding: 24 }}>
+              <div className="text-xs text-muted" style={{ marginBottom: 14 }}>{selected.numero_om ?? '—'} · Turno {selected.turno} · {selected.status}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <div><div className="form-label">Sistema</div><div className="text-sm">{selected.sistema ?? '—'}</div></div>
+                <div><div className="form-label">Subsistema</div><div className="text-sm">{selected.subsistema ?? '—'}</div></div>
+              </div>
+              <div style={{ marginBottom: 12 }}><div className="form-label">Sintoma / Ocorrência</div><div className="text-sm" style={{ background: 'var(--gray-50)', padding: 10, borderRadius: 8 }}>{selected.sintoma ?? '—'}</div></div>
+              {selected.causa ? <div style={{ marginBottom: 12 }}><div className="form-label">Causa identificada</div><div className="text-sm">{selected.causa}</div></div> : null}
+              {selected.executantes ? <div style={{ marginBottom: 12 }}><div className="form-label">Executantes</div><div className="text-sm">👷 {selected.executantes}</div></div> : null}
+
+              <div style={{ borderTop: '1px solid var(--border)', margin: '10px 0 12px', paddingTop: 14 }}>
+                <div className="fw-700 text-sm" style={{ marginBottom: 8 }}>🔧 Intervenções Realizadas</div>
+                {selected.intervencao
+                  ? <div className="text-sm" style={{ whiteSpace: 'pre-wrap', background: 'var(--gray-50)', padding: 10, borderRadius: 8, marginBottom: 12 }}>{selected.intervencao}</div>
+                  : <div className="text-xs text-muted" style={{ marginBottom: 12 }}>Nenhuma intervenção registrada ainda.</div>}
+                <textarea className="form-control" rows={2} placeholder="Descreva a nova intervenção realizada..." value={novaInt} onChange={e => setNovaInt(e.target.value)} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <button className="btn btn-primary btn-sm" onClick={salvarIntervencao} disabled={savingInt || !novaInt.trim()}>{savingInt ? 'Salvando...' : '＋ Adicionar Intervenção'}</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -12,7 +12,7 @@ function fmtMoeda(v: number | null | undefined) {
   return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 0 })
 }
 
-const FORM0 = { equipamento_tag: '', sistema: '', descricao: '', ocorrencias: '', custo_total: '', horas_perdidas: '', plano_desc: '', plano_resp: '', plano_prazo: '' }
+const FORM0 = { frota: '', equipamento_tag: '', sistema: '', agressor: '', descricao: '', horas_perdidas: '', criticidade: 'Média', acoes: '', responsavel: '', prazo: '' }
 
 export default function FalhasPage() {
   const [tab, setTab] = useState<'rafs' | 'agres'>('rafs')
@@ -30,7 +30,7 @@ export default function FalhasPage() {
       const [rRes, aRes, eRes] = await Promise.all([
         supabase.from('rafs').select('*').order('created_at', { ascending: false }),
         supabase.from('agressores').select('*').order('ocorrencias', { ascending: false }),
-        supabase.from('equipamentos').select('id,tag,categoria').order('tag'),
+        supabase.from('equipamentos').select('id,tag,categoria,modelo').order('tag'),
       ])
       setRafs((rRes.data ?? []) as RAF[])
       setAgres((aRes.data ?? []) as Agressor[])
@@ -45,30 +45,34 @@ export default function FalhasPage() {
 
   async function salvarAgressor() {
     setErro(null)
-    if (!form.equipamento_tag || !form.descricao) { setErro('Equipamento e descrição são obrigatórios.'); return }
+    if (!form.equipamento_tag || !form.agressor) { setErro('Equipamento e agressor são obrigatórios.'); return }
     setSaving(true)
     const equipId = equip.find(e => e.tag === form.equipamento_tag)?.id ?? null
     const { data: novo, error } = await supabase.from('agressores').insert({
       equipamento_id: equipId,
       equipamento_tag: form.equipamento_tag,
+      frota: form.frota || null,
       sistema: form.sistema || null,
-      descricao: form.descricao,
-      ocorrencias: form.ocorrencias ? Number(form.ocorrencias) : 0,
+      agressor: form.agressor,
+      descricao: form.descricao || form.agressor,
+      criticidade: form.criticidade || null,
+      acoes: form.acoes || null,
       horas_perdidas: form.horas_perdidas ? Number(form.horas_perdidas) : 0,
-      custo_total: form.custo_total ? Number(form.custo_total) : 0,
+      ocorrencias: 0,
+      custo_total: 0,
       status: 'ativo',
     }).select().single()
 
     if (error) { setErro('Erro ao salvar agressor: ' + error.message); setSaving(false); return }
 
-    if (novo && form.plano_desc) {
+    if (novo && form.acoes) {
       await supabase.from('acoes').insert({
         agressor_id: novo.id,
         equipamento_tag: form.equipamento_tag,
         tipo: 'Corretiva Estrutural',
-        descricao: form.plano_desc,
-        responsavel: form.plano_resp || '—',
-        prazo: form.plano_prazo || null,
+        descricao: form.acoes,
+        responsavel: form.responsavel || '—',
+        prazo: form.prazo || null,
         status: 'pendente',
       })
     }
@@ -171,15 +175,16 @@ export default function FalhasPage() {
           ) : (
             <div className="tbl-wrap">
               <table>
-                <thead><tr><th>Equipamento</th><th>Sistema</th><th>Descrição</th><th>Ocorr.</th><th>Custo Total</th><th>Status</th></tr></thead>
+                <thead><tr><th>Equipamento</th><th>Frota</th><th>Sistema</th><th>Agressor</th><th>Criticidade</th><th>Horas</th><th>Status</th></tr></thead>
                 <tbody>
                   {agres.map(a => (
                     <tr key={a.id} className="clickable">
                       <td className="fw-700">{a.equipamento_tag ?? '—'}</td>
+                      <td className="text-sm">{a.frota ?? '—'}</td>
                       <td className="text-sm">{a.sistema ?? '—'}</td>
-                      <td style={{ maxWidth: 260 }}><div className="fw-600 text-sm">{a.descricao}</div></td>
-                      <td><span className="badge badge-warning">{a.ocorrencias ?? 0}x</span></td>
-                      <td className={a.custo_total && a.custo_total > 100000 ? 'fw-700 text-danger' : 'fw-600'}>{fmtMoeda(a.custo_total)}</td>
+                      <td style={{ maxWidth: 240 }}><div className="fw-600 text-sm">{a.agressor ?? a.descricao}</div></td>
+                      <td><span className={'badge ' + (a.criticidade === 'Crítica' ? 'badge-danger' : a.criticidade === 'Alta' ? 'badge-warning' : a.criticidade === 'Média' ? 'badge-blue' : 'badge-gray')}>{a.criticidade ?? '—'}</span></td>
+                      <td className="fw-600">{a.horas_perdidas ? a.horas_perdidas + 'h' : '—'}</td>
                       <td>
                         <span className={'badge ' + (a.status === 'resolvido' ? 'badge-success' : a.status === 'em_tratamento' ? 'badge-blue' : 'badge-warning')}>
                           {a.status === 'em_tratamento' ? 'Tratando' : a.status === 'resolvido' ? 'Resolvido' : 'Ativo'}
@@ -204,51 +209,61 @@ export default function FalhasPage() {
             <div style={{ padding: 24 }}>
               <div className="form-row form-group">
                 <div>
+                  <label className="form-label">Frota</label>
+                  <select className="form-control" value={form.frota} onChange={e => setForm(f => ({ ...f, frota: e.target.value, equipamento_tag: '' }))}>
+                    <option value="">— selecione —</option>
+                    {[...new Set(equip.map(eq => eq.categoria).filter(Boolean))].sort().map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="form-label">Equipamento <span style={{ color: 'var(--danger)' }}>*</span></label>
                   <select className="form-control" value={form.equipamento_tag} onChange={e => setForm(f => ({ ...f, equipamento_tag: e.target.value }))}>
                     <option value="">— selecione —</option>
-                    {equip.map(eq => <option key={eq.id} value={eq.tag}>{eq.tag}{eq.categoria ? ' · ' + eq.categoria : ''}</option>)}
+                    {equip.filter(eq => !form.frota || eq.categoria === form.frota).map(eq => <option key={eq.id} value={eq.tag}>{eq.tag}{eq.modelo ? ' · ' + eq.modelo : ''}</option>)}
                   </select>
                 </div>
+              </div>
+              <div className="form-row form-group">
                 <div>
                   <label className="form-label">Sistema</label>
                   <input className="form-control" placeholder="Ex: Hidráulico, Motor..." value={form.sistema} onChange={e => setForm(f => ({ ...f, sistema: e.target.value }))} />
                 </div>
+                <div>
+                  <label className="form-label">Agressor <span style={{ color: 'var(--danger)' }}>*</span></label>
+                  <input className="form-control" placeholder="Ex: Vazamento na bomba principal" value={form.agressor} onChange={e => setForm(f => ({ ...f, agressor: e.target.value }))} />
+                </div>
               </div>
               <div className="form-group">
-                <label className="form-label">Descrição da falha recorrente <span style={{ color: 'var(--danger)' }}>*</span></label>
-                <textarea className="form-control" rows={2} placeholder="O que se repete e por quê é um agressor crônico..." value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
+                <label className="form-label">Descrição do agressor</label>
+                <textarea className="form-control" rows={2} placeholder="Detalhe o que se repete e por que é um agressor crônico..." value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
               </div>
-              <div className="form-row-3 form-group">
-                <div>
-                  <label className="form-label">Ocorrências</label>
-                  <input type="number" className="form-control" placeholder="Ex: 5" value={form.ocorrencias} onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))} />
-                </div>
+              <div className="form-row form-group">
                 <div>
                   <label className="form-label">Horas perdidas</label>
                   <input type="number" step="0.1" className="form-control" placeholder="Ex: 18" value={form.horas_perdidas} onChange={e => setForm(f => ({ ...f, horas_perdidas: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="form-label">Custo total (R$)</label>
-                  <input type="number" className="form-control" placeholder="Ex: 45000" value={form.custo_total} onChange={e => setForm(f => ({ ...f, custo_total: e.target.value }))} />
+                  <label className="form-label">Criticidade</label>
+                  <select className="form-control" value={form.criticidade} onChange={e => setForm(f => ({ ...f, criticidade: e.target.value }))}>
+                    <option value="Baixa">Baixa</option>
+                    <option value="Média">Média</option>
+                    <option value="Alta">Alta</option>
+                    <option value="Crítica">Crítica</option>
+                  </select>
                 </div>
               </div>
-
-              <div style={{ borderTop: '1px dashed var(--gray-300)', margin: '8px 0 14px', paddingTop: 12 }}>
-                <div className="fw-700 text-sm" style={{ marginBottom: 8 }}>✅ Plano de Ação (opcional — cria a ação no plano)</div>
-                <div className="form-group">
-                  <label className="form-label">Ação a executar</label>
-                  <textarea className="form-control" rows={2} placeholder="O que será feito para eliminar o agressor..." value={form.plano_desc} onChange={e => setForm(f => ({ ...f, plano_desc: e.target.value }))} />
+              <div className="form-group">
+                <label className="form-label">Ação</label>
+                <textarea className="form-control" rows={2} placeholder="O que será feito para eliminar o agressor..." value={form.acoes} onChange={e => setForm(f => ({ ...f, acoes: e.target.value }))} />
+              </div>
+              <div className="form-row form-group">
+                <div>
+                  <label className="form-label">Responsável</label>
+                  <input className="form-control" placeholder="Nome do responsável" value={form.responsavel} onChange={e => setForm(f => ({ ...f, responsavel: e.target.value }))} />
                 </div>
-                <div className="form-row form-group">
-                  <div>
-                    <label className="form-label">Responsável</label>
-                    <input className="form-control" placeholder="Nome" value={form.plano_resp} onChange={e => setForm(f => ({ ...f, plano_resp: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="form-label">Prazo</label>
-                    <input type="date" className="form-control" value={form.plano_prazo} onChange={e => setForm(f => ({ ...f, plano_prazo: e.target.value }))} />
-                  </div>
+                <div>
+                  <label className="form-label">Prazo</label>
+                  <input type="date" className="form-control" value={form.prazo} onChange={e => setForm(f => ({ ...f, prazo: e.target.value }))} />
                 </div>
               </div>
 
@@ -256,7 +271,7 @@ export default function FalhasPage() {
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancelar</button>
-                <button className="btn btn-primary" onClick={salvarAgressor} disabled={saving || !form.equipamento_tag || !form.descricao}>
+                <button className="btn btn-primary" onClick={salvarAgressor} disabled={saving || !form.equipamento_tag || !form.agressor}>
                   {saving ? 'Salvando...' : '✓ Salvar Agressor'}
                 </button>
               </div>

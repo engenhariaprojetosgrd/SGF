@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import type { Equipamento } from '@/lib/types'
+import type { Equipamento, OrdemManutencao } from '@/lib/types'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import s from './FrotaClient.module.css'
@@ -67,16 +67,39 @@ const FILTERS: [SF, string][] = [
 ]
 
 export default function FrotaClient() {
-  const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
+  const [equipRaw, setEquipRaw] = useState<Equipamento[]>([])
+  const [oms, setOms] = useState<OrdemManutencao[]>([])
   const [loadingEq, setLoadingEq] = useState(true)
   const [filter, setFilter] = useState<SF>('todos')
 
   useEffect(() => {
-    supabase.from('equipamentos').select('*').order('tag').then(({ data }) => {
-      setEquipamentos((data ?? []) as Equipamento[])
+    Promise.all([
+      supabase.from('equipamentos').select('*').order('tag'),
+      supabase.from('ordens_manutencao').select('equipamento_tag,status,criticidade,created_at').order('created_at', { ascending: false }),
+    ]).then(([eq, om]) => {
+      setEquipRaw((eq.data ?? []) as Equipamento[])
+      setOms((om.data ?? []) as OrdemManutencao[])
       setLoadingEq(false)
     })
   }, [])
+
+  // Espelha o status do Kanban: usa a OM mais recente de cada equipamento
+  const omStatus = useMemo(() => {
+    const OPEN: Record<string, string> = { aguardando_peca: 'aguardando-peca', em_execucao: 'manutencao', pendente: 'manutencao' }
+    const map: Record<string, string> = {}
+    const seen = new Set<string>()
+    for (const o of oms) {
+      if (!o.equipamento_tag || seen.has(o.equipamento_tag)) continue
+      seen.add(o.equipamento_tag)
+      const st = OPEN[o.status]
+      if (st) map[o.equipamento_tag] = st
+    }
+    return map
+  }, [oms])
+
+  const equipamentos = useMemo(
+    () => equipRaw.map(e => ({ ...e, status: (omStatus[e.tag] ?? e.status) as Equipamento['status'] })),
+    [equipRaw, omStatus])
 
   const filtered = useMemo(() =>
     filter === 'todos' ? equipamentos : equipamentos.filter(e => e.status === filter),

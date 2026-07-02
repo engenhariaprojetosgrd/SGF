@@ -85,9 +85,13 @@ export interface Agressor {
   id: string
   equipamento_id: string
   equipamento_tag: string
+  frota?: string
   sistema: string
   subsistema?: string
+  agressor?: string
   descricao: string
+  criticidade?: 'Baixa' | 'Média' | 'Alta' | 'Crítica'
+  acoes?: string
   ocorrencias: number
   horas_perdidas: number
   custo_total: number
