@@ -62,6 +62,9 @@ export default function AcoesPage() {
   const [form, setForm] = useState({ descricao: '', responsavel: '', prazo: '', tipo: 'Corretiva Estrutural', equipamento_tag: '' })
   const [saving, setSaving] = useState(false)
   const [origemNova, setOrigemNova] = useState<'gatilho_df' | 'manual'>('manual')
+  const [updId, setUpdId] = useState<string | null>(null)
+  const [upd, setUpd] = useState({ status: 'em_andamento', evidencia: '', dt_conclusao: '', responsavel: '', prazo: '' })
+  const [savingUpd, setSavingUpd] = useState(false)
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('novo')) {
       setOrigemNova('gatilho_df'); setShowModal(true)
@@ -75,6 +78,31 @@ export default function AcoesPage() {
     if (data) setAcoes(prev => [...prev, data])
     setSaving(false); setShowModal(false); setOrigemNova('manual')
     setForm({ descricao: '', responsavel: '', prazo: '', tipo: 'Corretiva Estrutural', equipamento_tag: '' })
+  }
+
+  async function patchAcao(id: string, patch: Record<string, unknown>) {
+    const { data } = await supabase.from('acoes').update(patch).eq('id', id).select().single()
+    if (data) setAcoes(prev => prev.map(x => x.id === id ? (data as Acao) : x))
+  }
+  const hojeISO = () => new Date().toISOString().slice(0, 10)
+  async function concluir(a: Acao) { await patchAcao(a.id, { status: 'concluida', dt_conclusao: hojeISO() }) }
+  async function reabrir(a: Acao) { await patchAcao(a.id, { status: 'em_andamento', dt_conclusao: null }) }
+  function openUpdate(a: Acao) {
+    setUpdId(a.id)
+    setUpd({
+      status: a.status === 'concluida' ? 'concluida' : a.status === 'cancelada' ? 'cancelada' : 'em_andamento',
+      evidencia: a.evidencia ?? '', dt_conclusao: a.dt_conclusao ? a.dt_conclusao.slice(0, 10) : '',
+      responsavel: a.responsavel ?? '', prazo: a.prazo ? a.prazo.slice(0, 10) : '',
+    })
+  }
+  async function salvarUpdate() {
+    if (!updId) return
+    setSavingUpd(true)
+    await patchAcao(updId, {
+      status: upd.status, evidencia: upd.evidencia || null, responsavel: upd.responsavel || null, prazo: upd.prazo || null,
+      dt_conclusao: upd.status === 'concluida' ? (upd.dt_conclusao || hojeISO()) : null,
+    })
+    setSavingUpd(false); setUpdId(null)
   }
 
   const comStatus = acoes.map(a => ({ a, st: statusCalc(a) }))
@@ -147,6 +175,7 @@ export default function AcoesPage() {
                   <th>Responsável</th>
                   <th>Prazo</th>
                   <th>Status</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -154,7 +183,7 @@ export default function AcoesPage() {
                   const dias = diasAte(a.prazo)
                   const meta = STATUS_META[st]
                   return (
-                    <tr key={a.id} className="clickable">
+                    <tr key={a.id} className="clickable" onClick={() => openUpdate(a)}>
                       <td>{origemBadge(a)}</td>
                       <td style={{ maxWidth: 360 }}>
                         <div className="fw-600 text-sm">{a.descricao}</div>
@@ -171,6 +200,11 @@ export default function AcoesPage() {
                         )}
                       </td>
                       <td><span className={`badge ${meta.badge}`}>{meta.label}</span></td>
+                      <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
+                        {a.status === 'concluida'
+                          ? <button className="btn btn-ghost btn-xs" onClick={() => reabrir(a)}>↩ Reabrir</button>
+                          : <button className="btn btn-success btn-xs" onClick={() => concluir(a)}>✓ Concluir</button>}
+                      </td>
                     </tr>
                   )
                 })}
@@ -212,6 +246,51 @@ export default function AcoesPage() {
           </div>
         </div>
       )}
+
+      {updId && (() => {
+        const a = acoes.find(x => x.id === updId)
+        if (!a) return null
+        return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setUpdId(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card-bg)', borderRadius: 12, width: '100%', maxWidth: 520, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>Atualizar Ação</span>
+              <button className="btn btn-ghost btn-xs" onClick={() => setUpdId(null)}>✕</button>
+            </div>
+            <div style={{ padding: 24 }}>
+              <div className="text-sm fw-600" style={{ marginBottom: 4 }}>{a.descricao}</div>
+              {a.codigo && <div className="text-xs text-muted" style={{ marginBottom: 16 }}>{a.codigo}</div>}
+              <div className="form-group">
+                <label className="form-label">Status</label>
+                <select className="form-control" value={upd.status} onChange={e => setUpd(u => ({ ...u, status: e.target.value }))}>
+                  <option value="em_andamento">Em Andamento</option>
+                  <option value="concluida">Concluída</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+              </div>
+              {upd.status === 'concluida' && (
+                <div className="form-group">
+                  <label className="form-label">Data de conclusão</label>
+                  <input type="date" className="form-control" value={upd.dt_conclusao} onChange={e => setUpd(u => ({ ...u, dt_conclusao: e.target.value }))} />
+                </div>
+              )}
+              <div className="form-group">
+                <label className="form-label">Evidência / o que foi feito</label>
+                <textarea className="form-control" rows={3} placeholder="Descreva a execução, peças trocadas, resultado..." value={upd.evidencia} onChange={e => setUpd(u => ({ ...u, evidencia: e.target.value }))} />
+              </div>
+              <div className="form-row form-group">
+                <div><label className="form-label">Responsável</label><input className="form-control" value={upd.responsavel} onChange={e => setUpd(u => ({ ...u, responsavel: e.target.value }))} /></div>
+                <div><label className="form-label">Prazo</label><input type="date" className="form-control" value={upd.prazo} onChange={e => setUpd(u => ({ ...u, prazo: e.target.value }))} /></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="btn btn-outline" onClick={() => setUpdId(null)}>Cancelar</button>
+                <button className="btn btn-primary" onClick={salvarUpdate} disabled={savingUpd}>{savingUpd ? 'Salvando...' : '✓ Salvar'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        )
+      })()}
     </div>
   )
 }
