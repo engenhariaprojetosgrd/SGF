@@ -93,6 +93,7 @@ export interface Agressor {
   descricao: string
   criticidade?: 'Baixa' | 'Média' | 'Alta' | 'Crítica'
   acoes?: string
+  observacao?: string
   codigo?: string
   foto_url?: string
   ocorrencias: number
