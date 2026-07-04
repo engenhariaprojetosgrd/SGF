@@ -73,6 +73,7 @@ export interface RAF {
   ishikawa?: unknown
   fta?: unknown
   causa_raiz?: string
+  observacao?: string
   foto_url?: string
   status: 'em_analise' | 'concluido' | 'aprovado' | 'cancelado'
   recorrente: boolean
