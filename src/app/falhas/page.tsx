@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase'
 import type { Agressor, Equipamento, Acao } from '@/lib/types'
 
 const FORM0 = { frota: '', equipamento_tag: '', sistema: '', agressor: '', descricao: '', observacao: '', horas_perdidas: '', criticidade: 'Média', status: 'ativo' }
+const COLS = ['ID', 'Equipamento Impactado', 'Sistema', 'Agressor', 'Criticidade', 'Status']
+const COLW0 = [140, 190, 150, 290, 120, 120]
 
 function nextCodigo(existentes: Agressor[]): string {
   const nums = existentes.map(a => { const m = (a.codigo ?? '').match(/^AGR-(\d{1,4})$/); return m ? parseInt(m[1]) : 0 })
@@ -33,6 +35,8 @@ export default function AgressoresPage() {
   const [acoesAll, setAcoesAll] = useState<Acao[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroFrota, setFiltroFrota] = useState('todas')
+  const [frotaMenu, setFrotaMenu] = useState(false)
+  const [colW, setColW] = useState<number[]>(COLW0)
 
   const [modal, setModal] = useState<'create' | 'detail' | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
@@ -43,7 +47,7 @@ export default function AgressoresPage() {
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { carregar(); try { const s = localStorage.getItem('agr-colw'); if (s) setColW(JSON.parse(s)) } catch {} }, [])
   async function carregar() {
     const [aRes, eRes, acRes] = await Promise.all([
       supabase.from('agressores').select('*').order('created_at', { ascending: false }),
@@ -54,6 +58,14 @@ export default function AgressoresPage() {
     setEquip((eRes.data ?? []) as Equipamento[])
     setAcoesAll((acRes.data ?? []) as Acao[])
     setLoading(false)
+  }
+
+  function startResize(i: number, e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation()
+    const startX = e.clientX, startW = colW[i]
+    const move = (ev: MouseEvent) => { const w = Math.max(60, startW + (ev.clientX - startX)); setColW(prev => prev.map((x, j) => j === i ? w : x)) }
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); setColW(prev => { try { localStorage.setItem('agr-colw', JSON.stringify(prev)) } catch {} ; return prev }) }
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
   }
 
   const frotas = useMemo(() => [...new Set(agres.map(a => a.frota).filter(Boolean))].sort() as string[], [agres])
@@ -145,7 +157,6 @@ export default function AgressoresPage() {
     if (data) { setAgres(prev => prev.map(x => x.id === editId ? (data as Agressor) : x)); setForm(f => ({ ...f, status: 'resolvido' })) }
   }
 
-  // campos de identificação reutilizados em criar/detalhe
   const camposIdent = (
     <>
       <div className="form-row form-group">
@@ -197,12 +208,24 @@ export default function AgressoresPage() {
         <div className="page-sub">Agressores crônicos da frota</div>
       </div>
 
-      {/* Filtro por frota */}
-      <div className="filter-bar">
-        <button className={'btn btn-sm ' + (filtroFrota === 'todas' ? 'btn-primary' : 'btn-outline')} onClick={() => setFiltroFrota('todas')}>Todas as frotas</button>
-        {frotas.map(fr => (
-          <button key={fr} className={'btn btn-sm ' + (filtroFrota === fr ? 'btn-primary' : 'btn-outline')} onClick={() => setFiltroFrota(fr)}>{fr}</button>
-        ))}
+      {/* Filtro por frota — dropdown suspenso */}
+      <div style={{ position: 'relative', display: 'inline-block', marginBottom: 16 }}>
+        <button className="btn btn-outline btn-sm" onClick={() => setFrotaMenu(o => !o)}>
+          🚜 Frota: <b style={{ marginLeft: 4 }}>{filtroFrota === 'todas' ? 'Todas' : filtroFrota}</b> <span style={{ marginLeft: 6 }}>▾</span>
+        </button>
+        {frotaMenu && (
+          <>
+            <div onClick={() => setFrotaMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
+            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.14)', zIndex: 20, minWidth: 240, overflow: 'hidden', padding: 4 }}>
+              {['todas', ...frotas].map(fr => (
+                <div key={fr} onClick={() => { setFiltroFrota(fr); setFrotaMenu(false) }}
+                  style={{ padding: '9px 12px', cursor: 'pointer', fontSize: 13, borderRadius: 6, fontWeight: filtroFrota === fr ? 700 : 400, background: filtroFrota === fr ? 'var(--primary-light)' : 'transparent', color: filtroFrota === fr ? 'var(--primary)' : 'var(--text)' }}>
+                  {fr === 'todas' ? 'Todas as frotas' : fr}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card" style={{ padding: 0 }}>
@@ -221,19 +244,30 @@ export default function AgressoresPage() {
           </div>
         ) : (
           <div className="tbl-wrap">
-            <table>
-              <thead><tr><th>ID</th><th>Equipamento Impactado</th><th>Sistema</th><th>Agressor</th><th>Criticidade</th><th>Status</th></tr></thead>
+            <table style={{ tableLayout: 'fixed', width: colW.reduce((a, b) => a + b, 0) }}>
+              <colgroup>{colW.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+              <thead>
+                <tr>
+                  {COLS.map((c, i) => (
+                    <th key={c} style={{ position: 'relative', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                      {c}
+                      <span onMouseDown={e => startResize(i, e)} title="Arraste para redimensionar"
+                        style={{ position: 'absolute', top: 0, right: 0, width: 8, height: '100%', cursor: 'col-resize' }} />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
               <tbody>
                 {lista.map(a => {
                   const acs = acoesAll.filter(x => x.agressor_id === a.id)
                   const d = acs.filter(x => x.status === 'concluida').length
                   return (
                     <tr key={a.id} className="clickable" onClick={() => abrirDetalhe(a)}>
-                      <td className="text-xs fw-700" style={{ color: 'var(--primary)' }}>{a.codigo ?? '—'}</td>
-                      <td className="fw-700">{a.equipamento_tag || 'Toda a frota'}</td>
-                      <td className="text-sm">{a.sistema ?? '—'}</td>
-                      <td style={{ maxWidth: 240 }}>
-                        <div className="fw-600 text-sm">{a.agressor ?? a.descricao}</div>
+                      <td className="text-xs fw-700" style={{ color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.codigo ?? '—'}</td>
+                      <td className="fw-700" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.equipamento_tag || 'Toda a frota'}</td>
+                      <td className="text-sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.sistema ?? '—'}</td>
+                      <td>
+                        <div className="fw-600 text-sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.agressor ?? a.descricao}</div>
                         {acs.length > 0 && <div className="text-xs text-muted mt4">✔ {d}/{acs.length} ações</div>}
                       </td>
                       <td>{critBadge(a.criticidade)}</td>
@@ -301,7 +335,7 @@ export default function AgressoresPage() {
       {modal === 'detail' && atual && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 20, overflowY: 'auto' }} onClick={() => setModal(null)}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card-bg)', borderRadius: 14, width: '100%', maxWidth: 640, margin: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
-            {/* Cabeçalho colorido */}
+            {/* Cabeçalho azul */}
             <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg, var(--primary), #1e3a8a)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ fontSize: 11, opacity: .8, fontWeight: 700, letterSpacing: .5 }}>{atual.codigo ?? 'AGRESSOR'} · {atual.equipamento_tag || 'Toda a frota'}</div>
@@ -312,28 +346,43 @@ export default function AgressoresPage() {
             </div>
 
             <div style={{ padding: 24, maxHeight: 'calc(92vh - 96px)', overflowY: 'auto' }}>
-              {/* Progresso do checklist */}
-              <div style={{ marginBottom: 20 }}>
+              {/* 1) DESCRIÇÃO no topo */}
+              {form.descricao && (
+                <div style={{ marginBottom: 20 }}>
+                  <div className="text-xs fw-700 text-muted" style={{ marginBottom: 6 }}>DESCRIÇÃO</div>
+                  <div className="text-sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{form.descricao}</div>
+                </div>
+              )}
+
+              {/* 2) FOTO */}
+              {atual.foto_url && (
+                <div style={{ marginBottom: 20 }}>
+                  <div className="text-xs fw-700 text-muted" style={{ marginBottom: 6 }}>FOTO</div>
+                  <a href={atual.foto_url} target="_blank" rel="noreferrer"><img src={atual.foto_url} alt="Foto do agressor" style={{ maxWidth: '100%', maxHeight: 240, borderRadius: 10, border: '1px solid var(--border)' }} /></a>
+                </div>
+              )}
+
+              {/* 3) OBSERVAÇÃO */}
+              {form.observacao && (
+                <div style={{ marginBottom: 20 }}>
+                  <div className="text-xs fw-700 text-muted" style={{ marginBottom: 6 }}>OBSERVAÇÃO</div>
+                  <div className="text-sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{form.observacao}</div>
+                </div>
+              )}
+
+              {/* 4) PROGRESSO + CHECKLIST */}
+              <div style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span className="text-xs fw-700 text-muted">PROGRESSO DAS AÇÕES</span>
                   <span className="text-xs fw-700">{doneCount}/{acoesDoAtual.length} · {pct}%</span>
                 </div>
                 <div className="pb-wrap"><div className={'pb ' + (pct === 100 ? 'success' : pct > 0 ? 'warning' : '')} style={{ width: pct + '%' }} /></div>
                 {acoesDoAtual.length > 0 && pct === 100 && atual.status !== 'resolvido' && (
-                  <button className="btn btn-success btn-sm" style={{ marginTop: 10 }} onClick={resolverAgressor}>✓ Todas concluídas — marcar agressor como Resolvido</button>
+                  <button className="btn btn-success btn-sm" style={{ marginTop: 10 }} onClick={resolverAgressor}>✓ Todas concluídas — marcar como Resolvido</button>
                 )}
               </div>
 
-              {/* Foto */}
-              {atual.foto_url && (
-                <div style={{ marginBottom: 20 }}>
-                  <div className="text-xs fw-700 text-muted" style={{ marginBottom: 6 }}>FOTO</div>
-                  <a href={atual.foto_url} target="_blank" rel="noreferrer"><img src={atual.foto_url} alt="Foto do agressor" style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 10, border: '1px solid var(--border)' }} /></a>
-                </div>
-              )}
-
-              {/* Checklist de ações */}
-              <div className="text-xs fw-700 text-muted" style={{ marginBottom: 8 }}>CHECKLIST DE AÇÕES</div>
+              <div className="text-xs fw-700 text-muted" style={{ margin: '16px 0 8px' }}>CHECKLIST DE AÇÕES</div>
               {acoesDoAtual.length === 0 && <div className="text-xs text-muted" style={{ marginBottom: 8 }}>Nenhuma ação cadastrada ainda.</div>}
               {acoesDoAtual.map(ac => {
                 const ok = ac.status === 'concluida'
@@ -347,7 +396,6 @@ export default function AgressoresPage() {
                   </div>
                 )
               })}
-              {/* Adicionar ação */}
               <div style={{ border: '1px dashed var(--border)', borderRadius: 8, padding: 12, marginTop: 8, marginBottom: 20 }}>
                 <input className="form-control" placeholder="Nova ação para eliminar o agressor..." value={novaAcao.desc} onChange={e => setNovaAcao(n => ({ ...n, desc: e.target.value }))} />
                 <div className="form-row" style={{ marginTop: 8 }}>
@@ -359,7 +407,7 @@ export default function AgressoresPage() {
                 </div>
               </div>
 
-              {/* Editar identificação + descrição + observação */}
+              {/* 5) Editar (recolhível) */}
               <details style={{ marginBottom: 16 }}>
                 <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 13, color: 'var(--primary)', marginBottom: 12 }}>✏️ Editar dados do agressor</summary>
                 <div style={{ marginTop: 12 }}>
@@ -379,10 +427,6 @@ export default function AgressoresPage() {
                   </div>
                 </div>
               </details>
-
-              {/* Descrição/Observação em leitura rápida */}
-              {form.descricao && <div style={{ marginBottom: 12 }}><div className="text-xs fw-700 text-muted" style={{ marginBottom: 4 }}>DESCRIÇÃO</div><div className="text-sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{form.descricao}</div></div>}
-              {form.observacao && <div style={{ marginBottom: 12 }}><div className="text-xs fw-700 text-muted" style={{ marginBottom: 4 }}>OBSERVAÇÃO</div><div className="text-sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{form.observacao}</div></div>}
 
               {erro && <div className="alert alert-danger" style={{ marginBottom: 12 }}>{erro}</div>}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 16 }}>
