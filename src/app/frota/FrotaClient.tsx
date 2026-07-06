@@ -42,13 +42,15 @@ function getCat(cat: string): CatConf {
 
 /* ─── Status config ─── */
 const ST: Record<string, { label: string; badgeBg: string; badgeColor: string; dot: string }> = {
-  operando:          { label: 'Operando',     badgeBg: '#d1fae5', badgeColor: '#065f46', dot: '#10b981' },
-  manutencao:        { label: 'Em Manutenção',badgeBg: '#fff7ed', badgeColor: '#c2410c', dot: '#f97316' },
-  'aguardando-peca': { label: 'Ag. Peça',     badgeBg: '#fffbeb', badgeColor: '#92400e', dot: '#f59e0b' },
-  critico:           { label: 'CRÍTICO',       badgeBg: '#fde8e8', badgeColor: '#9b1c1c', dot: '#ef4444' },
-  parado:            { label: 'Parado',        badgeBg: '#f3f4f6', badgeColor: '#6b7280', dot: '#9ca3af' },
+  operando:          { label: 'Operando',      badgeBg: '#d1fae5', badgeColor: '#065f46', dot: '#10b981' },
+  preventiva:        { label: 'Preventiva',    badgeBg: '#eff6ff', badgeColor: '#1e40af', dot: '#3b82f6' },
+  corretiva:         { label: 'Corretiva',     badgeBg: '#fff7ed', badgeColor: '#c2410c', dot: '#f97316' },
+  'aguardando-peca': { label: 'Ag. Peça',      badgeBg: '#fffbeb', badgeColor: '#92400e', dot: '#f59e0b' },
+  desprogramado:     { label: 'Desprogramado', badgeBg: '#f3f4f6', badgeColor: '#6b7280', dot: '#9ca3af' },
 }
-function st(status: string) { return ST[status] ?? ST['parado'] }
+const LEGACY: Record<string, string> = { manutencao: 'corretiva', critico: 'corretiva', parado: 'desprogramado' }
+const normEq = (x: string) => LEGACY[x] ?? x
+function st(status: string) { return ST[status] ?? ST['desprogramado'] }
 
 /* ─── Frota ordering ─── */
 const FROTA_ORDER = ['PRO', 'AUX']
@@ -56,14 +58,14 @@ const FROTA_LABELS: Record<string, string> = { PRO: 'Produção', AUX: 'Auxiliar
 const FROTA_COLORS: Record<string, string> = { PRO: '#1a56db', AUX: '#6b7280' }
 
 /* ─── Filter types ─── */
-type SF = 'todos' | 'operando' | 'manutencao' | 'aguardando-peca' | 'critico' | 'parado'
+type SF = 'todos' | 'operando' | 'preventiva' | 'corretiva' | 'aguardando-peca' | 'desprogramado'
 const FILTERS: [SF, string][] = [
   ['todos', 'Todos'],
   ['operando', '✅ Operando'],
-  ['manutencao', '🔧 Manutenção'],
+  ['preventiva', '🛠️ Preventiva'],
+  ['corretiva', '🔧 Corretiva'],
   ['aguardando-peca', '⏳ Ag. Peça'],
-  ['critico', '🔴 Crítico'],
-  ['parado', '⛔ Parado'],
+  ['desprogramado', '⛔ Desprogramado'],
 ]
 
 export default function FrotaClient() {
@@ -75,7 +77,7 @@ export default function FrotaClient() {
   useEffect(() => {
     Promise.all([
       supabase.from('equipamentos').select('*').order('tag'),
-      supabase.from('ordens_manutencao').select('equipamento_tag,status,criticidade,created_at').order('created_at', { ascending: false }),
+      supabase.from('ordens_manutencao').select('equipamento_tag,status,tipo,criticidade,created_at').order('created_at', { ascending: false }),
     ]).then(([eq, om]) => {
       setEquipRaw((eq.data ?? []) as Equipamento[])
       setOms((om.data ?? []) as OrdemManutencao[])
@@ -85,20 +87,22 @@ export default function FrotaClient() {
 
   // Espelha o status do Kanban: usa a OM mais recente de cada equipamento
   const omStatus = useMemo(() => {
-    const OPEN: Record<string, string> = { aguardando_peca: 'aguardando-peca', em_execucao: 'manutencao', pendente: 'manutencao' }
     const map: Record<string, string> = {}
     const seen = new Set<string>()
     for (const o of oms) {
       if (!o.equipamento_tag || seen.has(o.equipamento_tag)) continue
       seen.add(o.equipamento_tag)
-      const st = OPEN[o.status]
-      if (st) map[o.equipamento_tag] = st
+      const st = o.status ?? ''
+      if (st === 'concluido' || st === 'cancelado') continue // OM fechada → mantém o status do equipamento
+      if (st === 'aguardando_peca') { map[o.equipamento_tag] = 'aguardando-peca'; continue }
+      const t = (o.tipo ?? '').toLowerCase()
+      map[o.equipamento_tag] = t.startsWith('prevent') ? 'preventiva' : 'corretiva'
     }
     return map
   }, [oms])
 
   const equipamentos = useMemo(
-    () => equipRaw.map(e => ({ ...e, status: (omStatus[e.tag] ?? e.status) as Equipamento['status'] })),
+    () => equipRaw.map(e => ({ ...e, status: (omStatus[e.tag] ?? normEq(e.status)) as Equipamento['status'] })),
     [equipRaw, omStatus])
 
   const filtered = useMemo(() =>
@@ -107,12 +111,12 @@ export default function FrotaClient() {
 
   /* KPI counts */
   const cnt = {
-    total:      equipamentos.length,
-    operando:   equipamentos.filter(e => e.status === 'operando').length,
-    manutencao: equipamentos.filter(e => e.status === 'manutencao').length,
-    aguardando: equipamentos.filter(e => e.status === 'aguardando-peca').length,
-    critico:    equipamentos.filter(e => e.status === 'critico').length,
-    parado:     equipamentos.filter(e => e.status === 'parado').length,
+    total:         equipamentos.length,
+    operando:      equipamentos.filter(e => e.status === 'operando').length,
+    preventiva:    equipamentos.filter(e => e.status === 'preventiva').length,
+    corretiva:     equipamentos.filter(e => e.status === 'corretiva').length,
+    aguardando:    equipamentos.filter(e => e.status === 'aguardando-peca').length,
+    desprogramado: equipamentos.filter(e => e.status === 'desprogramado').length,
   }
 
   /* Group filtered → frota → categoria */
@@ -141,12 +145,12 @@ export default function FrotaClient() {
       {/* ── Fleet Summary ── */}
       <div className={s.fleetSummary}>
         {[
-          { cls: '#1a56db', num: cnt.total,      label: 'Total'      },
-          { cls: '#057a55', num: cnt.operando,   label: 'Operando'   },
-          { cls: '#d97706', num: cnt.manutencao, label: 'Manutenção' },
-          { cls: '#f59e0b', num: cnt.aguardando, label: 'Ag. Peça'   },
-          { cls: '#c81e1e', num: cnt.critico,    label: 'Crítico'    },
-          { cls: '#6b7280', num: cnt.parado,     label: 'Parado'     },
+          { cls: '#1a56db', num: cnt.total,         label: 'Total'         },
+          { cls: '#057a55', num: cnt.operando,      label: 'Operando'      },
+          { cls: '#3b82f6', num: cnt.preventiva,    label: 'Preventiva'    },
+          { cls: '#f97316', num: cnt.corretiva,     label: 'Corretiva'     },
+          { cls: '#f59e0b', num: cnt.aguardando,    label: 'Ag. Peça'      },
+          { cls: '#6b7280', num: cnt.desprogramado, label: 'Desprogramado' },
         ].map(({ cls, num, label }) => (
           <div key={label} className={s.fsumCard} style={{ borderTopColor: cls }}>
             <span className={s.fsumNum} style={{ color: cls }}>{num}</span>
@@ -197,11 +201,11 @@ export default function FrotaClient() {
               {Object.entries(cats).sort().map(([cat, items]) => {
                 const conf = getCat(cat)
                 const icon = ICONS[conf.tipo] ?? ICONS.escavadeira
-                const opC   = items.filter(e => e.status === 'operando').length
-                const mnC   = items.filter(e => e.status === 'manutencao').length
-                const aguC  = items.filter(e => e.status === 'aguardando-peca').length
-                const crC   = items.filter(e => e.status === 'critico').length
-                const parC  = items.filter(e => e.status === 'parado').length
+                const opC    = items.filter(e => e.status === 'operando').length
+                const prevC  = items.filter(e => e.status === 'preventiva').length
+                const corrC  = items.filter(e => e.status === 'corretiva').length
+                const aguC   = items.filter(e => e.status === 'aguardando-peca').length
+                const despC  = items.filter(e => e.status === 'desprogramado').length
 
                 return (
                   <div key={cat} className={s.fleetSection}>
@@ -211,11 +215,11 @@ export default function FrotaClient() {
                       <span className={s.fleetSecTitle}>{cat}</span>
                       <span className={s.fleetSecBadge}>{items.length} equip.</span>
                       <div className={s.fleetSecStats}>
-                        {opC  > 0 && <span>✅ {opC} oper.</span>}
-                        {mnC  > 0 && <span>🔧 {mnC} manut.</span>}
-                        {aguC > 0 && <span>⏳ {aguC} ag.peça</span>}
-                        {crC  > 0 && <span style={{ color: '#c81e1e', fontWeight: 700 }}>🔴 {crC} crít.</span>}
-                        {parC > 0 && <span>⛔ {parC} parado</span>}
+                        {opC   > 0 && <span>✅ {opC} oper.</span>}
+                        {prevC > 0 && <span>🛠️ {prevC} prev.</span>}
+                        {corrC > 0 && <span style={{ color: '#c2410c', fontWeight: 700 }}>🔧 {corrC} corr.</span>}
+                        {aguC  > 0 && <span>⏳ {aguC} ag.peça</span>}
+                        {despC > 0 && <span>⛔ {despC} desprog.</span>}
                       </div>
                     </div>
 
@@ -223,12 +227,12 @@ export default function FrotaClient() {
                     <div className={s.fleetGrid}>
                       {items.map(eq => {
                         const cfg = st(eq.status)
-                        const isCrit = eq.status === 'critico'
-                        const isPar  = eq.status === 'parado'
+                        const isCorr = eq.status === 'corretiva'
+                        const isDesp = eq.status === 'desprogramado'
                         return (
                           <div
                             key={eq.id}
-                            className={`${s.equipCard} ${isCrit ? s.equipCardCritico : ''} ${isPar ? s.equipCardParado : ''}`}
+                            className={`${s.equipCard} ${isCorr ? s.equipCardCritico : ''} ${isDesp ? s.equipCardParado : ''}`}
                           >
                             {/* Icon area */}
                             <div className={s.equipIconArea} style={{ background: conf.bg }}>

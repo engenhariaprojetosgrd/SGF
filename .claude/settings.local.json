@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Google_Drive__search_files",
+      "Bash(python -c \"import sys,json; files=json.load\\(sys.stdin\\)['files']; [print\\(f['id'], f['mimeType'][:40], f.get\\('name','?'\\)\\) for f in files]\")",
+      "mcp__claude_ai_Google_Drive__read_file_content"
+    ]
+  }
+}

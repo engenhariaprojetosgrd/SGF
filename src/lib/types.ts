@@ -1,10 +1,10 @@
 // ─── Equipamento ─────────────────────────────────────────────
 export type StatusEquipamento =
   | 'operando'
-  | 'manutencao'
+  | 'preventiva'
+  | 'corretiva'
   | 'aguardando-peca'
-  | 'critico'
-  | 'parado'
+  | 'desprogramado'
 
 export interface Equipamento {
   id: string
@@ -181,18 +181,18 @@ export interface Turno {
 // ─── Helpers ─────────────────────────────────────────────────
 export const STATUS_LABELS: Record<StatusEquipamento, string> = {
   operando: 'Operando',
-  manutencao: 'Em Manutenção',
+  preventiva: 'Preventiva',
+  corretiva: 'Corretiva',
   'aguardando-peca': 'Ag. Peça',
-  critico: 'CRÍTICO',
-  parado: 'Parado',
+  desprogramado: 'Desprogramado',
 }
 
 export const STATUS_COLORS: Record<StatusEquipamento, string> = {
   operando: '#057a55',
-  manutencao: '#d97706',
-  'aguardando-peca': '#9333ea',
-  critico: '#c81e1e',
-  parado: '#6b7280',
+  preventiva: '#3b82f6',
+  corretiva: '#f97316',
+  'aguardando-peca': '#f59e0b',
+  desprogramado: '#6b7280',
 }
 
 export const DF_META = 85
