@@ -25,7 +25,7 @@ export default function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 30 }}>⚙️</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--primary)' }}>SGF</div>
-          <div className="text-xs text-muted">Sistema de Gestão de Falhas da Frota</div>
+          <div className="text-xs text-muted">Sistema de Gestão da Frota</div>
           <div className="text-xs text-muted" style={{ marginTop: 4 }}>GRD · Mineração Rio do Norte · Engenharia</div>
         </div>
         <div className="form-group">

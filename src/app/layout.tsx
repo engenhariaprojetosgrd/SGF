@@ -6,7 +6,7 @@ import { Shell } from '@/components/Shell'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'SGF — Sistema de Gestão de Falhas da Frota',
+  title: 'SGF — Sistema de Gestão da Frota',
   description: 'Gestão centralizada de falhas, manutenção e disponibilidade da frota industrial',
 }
 

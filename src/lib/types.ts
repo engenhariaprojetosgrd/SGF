@@ -48,6 +48,7 @@ export interface OrdemManutencao {
   dt_inicio?: string
   dt_conclusao?: string
   parada_horas?: number
+  prazo_liberacao?: string
   observacoes?: string
   criado_por?: string
   created_at: string

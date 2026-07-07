@@ -24,6 +24,7 @@ const nav = [
     items: [
       { id: 'kanban', href: '/kanban', label: 'Kanban do Turno', icon: '🗂️' },
       { id: 'atividade', href: '/atividade/nova', label: 'Nova Atividade', icon: '➕' },
+      { id: 'diario', href: '/diario', label: 'Diário de Bordo', icon: '📔' },
       { id: 'corretiva', href: '/corretiva', label: 'Histórico Corretiva', icon: '📋' },
       { id: 'observacoes', href: '/observacoes', label: 'Observações', icon: '📌' },
     ],
@@ -49,7 +50,7 @@ export function Sidebar() {
         <div className="sidebar-logo-icon">⚙️</div>
         <div>
           <div className="sidebar-logo-title">SGF</div>
-          <div className="sidebar-logo-sub">Gestão de Falhas da Frota</div>
+          <div className="sidebar-logo-sub">Gestão da Frota</div>
         </div>
       </div>
 
