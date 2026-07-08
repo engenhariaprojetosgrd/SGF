@@ -35,6 +35,7 @@ export default function AgressoresPage() {
   const [acoesAll, setAcoesAll] = useState<Acao[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroFrota, setFiltroFrota] = useState('todas')
+  const [verArquivados, setVerArquivados] = useState(false)
   const [frotaMenu, setFrotaMenu] = useState(false)
   const [colW, setColW] = useState<number[]>(COLW0)
 
@@ -69,7 +70,10 @@ export default function AgressoresPage() {
   }
 
   const frotas = useMemo(() => [...new Set(agres.map(a => a.frota).filter(Boolean))].sort() as string[], [agres])
-  const lista = useMemo(() => filtroFrota === 'todas' ? agres : agres.filter(a => a.frota === filtroFrota), [agres, filtroFrota])
+  const lista = useMemo(() => agres.filter(a =>
+    (verArquivados ? !!a.arquivado : !a.arquivado) &&
+    (filtroFrota === 'todas' || a.frota === filtroFrota)
+  ), [agres, filtroFrota, verArquivados])
   const atual = useMemo(() => agres.find(a => a.id === editId) ?? null, [agres, editId])
   const acoesDoAtual = useMemo(() => acoesAll.filter(a => a.agressor_id === editId), [acoesAll, editId])
   const doneCount = acoesDoAtual.filter(a => a.status === 'concluida').length
@@ -156,6 +160,12 @@ export default function AgressoresPage() {
     const { data } = await supabase.from('agressores').update({ status: 'resolvido' }).eq('id', editId).select().single()
     if (data) { setAgres(prev => prev.map(x => x.id === editId ? (data as Agressor) : x)); setForm(f => ({ ...f, status: 'resolvido' })) }
   }
+  async function arquivar(val: boolean) {
+    if (!editId) return
+    const { data } = await supabase.from('agressores').update({ arquivado: val }).eq('id', editId).select().single()
+    if (data) setAgres(prev => prev.map(x => x.id === editId ? (data as Agressor) : x))
+    setModal(null)
+  }
 
   const camposIdent = (
     <>
@@ -226,11 +236,14 @@ export default function AgressoresPage() {
             </div>
           </>
         )}
+        <button className="btn btn-outline btn-sm" style={{ marginLeft: 8 }} onClick={() => setVerArquivados(v => !v)}>
+          {verArquivados ? '← Voltar aos ativos' : '📦 Ver arquivados'}
+        </button>
       </div>
 
       <div className="card" style={{ padding: 0 }}>
         <div className="card-hd">
-          <span className="card-title">Agressores Crônicos da Frota</span>
+          <span className="card-title">{verArquivados ? 'Agressores Arquivados' : 'Agressores Crônicos da Frota'}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="text-xs text-muted">{lista.length} agressor{lista.length !== 1 ? 'es' : ''}</span>
             <button className="btn btn-primary btn-sm" onClick={abrirNovo}>＋ Adicionar Agressor</button>
@@ -432,6 +445,9 @@ export default function AgressoresPage() {
               <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 16 }}>
                 <div>{statusBadge(form.status)} {critBadge(form.criticidade)}</div>
                 <div style={{ display: 'flex', gap: 8 }}>
+                  {atual.arquivado
+                    ? <button className="btn btn-outline" onClick={() => arquivar(false)}>♻ Desarquivar</button>
+                    : <button className="btn btn-ghost" onClick={() => arquivar(true)} title="Some da lista sem apagar">📦 Arquivar</button>}
                   <button className="btn btn-outline" onClick={() => setModal(null)}>Fechar</button>
                   <button className="btn btn-primary" onClick={salvarDetalhe} disabled={saving}>{saving ? 'Salvando...' : '✓ Salvar alterações'}</button>
                 </div>

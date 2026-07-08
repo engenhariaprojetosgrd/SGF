@@ -97,6 +97,7 @@ export interface Agressor {
   acoes?: string
   observacao?: string
   codigo?: string
+  arquivado?: boolean
   foto_url?: string
   ocorrencias: number
   horas_perdidas: number
@@ -208,6 +209,10 @@ export interface OcorrenciaCorretiva {
   sub_estado?: string
   duracao_seg: number
   resp?: string
+  numero_om?: string
+  tipo?: string
+  categoria_tempo?: string
+  linha_hash?: string
   sistema?: string
   subsistema?: string
   classificado: boolean
