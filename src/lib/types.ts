@@ -197,3 +197,20 @@ export const STATUS_COLORS: Record<StatusEquipamento, string> = {
 }
 
 export const DF_META = 85
+
+// ─── Ocorrência Corretiva (Perfil de Perda) ─────────────────
+export interface OcorrenciaCorretiva {
+  id: string
+  data?: string
+  equipamento_tag?: string
+  frota?: string
+  descricao?: string
+  sub_estado?: string
+  duracao_seg: number
+  resp?: string
+  sistema?: string
+  subsistema?: string
+  classificado: boolean
+  import_lote?: string
+  created_at: string
+}

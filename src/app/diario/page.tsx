@@ -19,6 +19,11 @@ function fmtData(d: string | null | undefined) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
 }
+function fmtDataHora(d: string | null | undefined) {
+  if (!d) return '—'
+  const x = new Date(d)
+  return x.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + x.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
 const hojeISO = () => new Date().toISOString().slice(0, 10)
 
 export default function DiarioBordoPage() {
@@ -56,7 +61,7 @@ export default function DiarioBordoPage() {
   const frotas = useMemo(() => [...new Set(oms.map(catOf).filter(f => f !== '—'))].sort(), [oms, equipByTag])
   const lista = useMemo(() => filtroFrota === 'todas' ? oms : oms.filter(o => catOf(o) === filtroFrota), [oms, filtroFrota, equipByTag])
 
-  function abrir(o: OrdemManutencao) { setSel(o); setPrazo(o.prazo_liberacao ? o.prazo_liberacao.slice(0, 10) : '') }
+  function abrir(o: OrdemManutencao) { setSel(o); setPrazo(o.prazo_liberacao ? o.prazo_liberacao.slice(0, 16) : '') }
 
   async function salvarPrazo() {
     if (!sel) return
@@ -135,7 +140,7 @@ export default function DiarioBordoPage() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div className="text-xs text-muted" style={{ fontWeight: 700 }}>LIBERAÇÃO</div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{o.prazo_liberacao ? fmtData(o.prazo_liberacao) : 'a definir'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{o.prazo_liberacao ? fmtDataHora(o.prazo_liberacao) : 'a definir'}</div>
                     </div>
                   </div>
                 </div>
@@ -174,7 +179,7 @@ export default function DiarioBordoPage() {
               <div className="form-group">
                 <label className="form-label">Prazo de liberação</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="date" className="form-control" value={prazo} onChange={e => setPrazo(e.target.value)} />
+                  <input type="datetime-local" className="form-control" value={prazo} onChange={e => setPrazo(e.target.value)} />
                   <button className="btn btn-outline" onClick={salvarPrazo} disabled={saving}>Salvar prazo</button>
                 </div>
               </div>

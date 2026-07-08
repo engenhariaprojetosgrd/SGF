@@ -17,6 +17,7 @@ const nav = [
       { id: 'falhas', href: '/falhas', label: 'Agressores', icon: '🟡' },
       { id: 'raf', href: '/raf', label: 'RAF', icon: '🔍' },
       { id: 'acoes', href: '/acoes', label: 'Plano de Ação', icon: '✅' },
+      { id: 'perfil', href: '/perfil', label: 'Perfil de Perda', icon: '📉' },
     ],
   },
   {
